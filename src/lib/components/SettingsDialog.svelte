@@ -8,9 +8,11 @@
   export let isOpen = false;
   export let settings: Settings;
 
-  const baseUrl = (import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/");
   function assetUrl(path: string): string {
-    return baseUrl + (path || "").replace(/^\//, "");
+    const p = (path || "").replace(/^\//, "");
+    if (typeof document === "undefined") return (import.meta.env.BASE_URL ?? "/") + p;
+    const base = new URL(".", document.baseURI).pathname.replace(/\/?$/, "/");
+    return base + p;
   }
 
   // Track which sections are collapsed

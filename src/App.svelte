@@ -64,9 +64,12 @@
   // Browser-only build: file operations use the browser file store and
   // localStorage. Electron-specific APIs have been removed.
 
-  const baseUrl = (import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/");
+  // Resolve asset base from current page so assets work on any base path (e.g. /Visualizer/)
   function assetUrl(path: string): string {
-    return baseUrl + (path || "").replace(/^\//, "");
+    const p = (path || "").replace(/^\//, "");
+    if (typeof document === "undefined") return (import.meta.env.BASE_URL ?? "/") + p;
+    const base = new URL(".", document.baseURI).pathname.replace(/\/?$/, "/");
+    return base + p;
   }
 
   function normalizeLines(input: Line[]): Line[] {
