@@ -2,15 +2,16 @@
   import type * as d3 from "d3";
   import type { BasePoint } from "../../types";
 
-  export let robotXY: BasePoint;
+  /** Origin for θ_b (bot or turret center in pixels). */
+  export let originXY: BasePoint;
   export let x: d3.ScaleLinear<number, number, number>;
   export let y: d3.ScaleLinear<number, number, number>;
   export let goal: { x: number; y: number };
   export let goalLabel: string = "Red Alliance Red Goal";
 
-  // Bot position in field coordinates (inches)
-  $: xb = x.invert(robotXY.x);
-  $: yb = y.invert(robotXY.y);
+  // Origin position in field coordinates (inches) for x_b, y_b, θ_b
+  $: xb = x.invert(originXY.x);
+  $: yb = y.invert(originXY.y);
   $: xg = goal.x;
   $: yg = goal.y;
 
@@ -39,6 +40,6 @@
     </span>
   </div>
   <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-    θ<sub>b</sub> = angle from bot to goal (against the goal).
+    θ<sub>b</sub> = angle from origin to goal. Press <kbd>T</kbd> to use turret center.
   </p>
 </div>

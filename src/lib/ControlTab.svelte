@@ -39,6 +39,8 @@
 
   export let shapes: Shape[];
   export let redGoalCenter: { x: number; y: number };
+  /** Origin for θ_b (bot or turret center in pixels). Used by BotToGoalSection for x_b, y_b, θ_b. */
+  export let thetaBOriginPx: { x: number; y: number };
   export let recordChange: () => void;
 
   // Reference exported but unused props to silence Svelte unused-export warnings
@@ -525,7 +527,7 @@
     <RobotPositionDisplay {robotXY} {robotHeading} {x} {y} />
 
     <BotToGoalSection
-      {robotXY}
+      originXY={thetaBOriginPx}
       {x}
       {y}
       goal={redGoalCenter}

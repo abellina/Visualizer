@@ -97,6 +97,8 @@
   let manualBotPosition: { x: number; y: number } | null = null;
   /** When set, overrides animation heading (e.g. after a/d/s rotation). Cleared with Escape. */
   let manualHeading: number | null = null;
+  /** When true, θ_b triangle and bot-to-goal line use turret center instead of bot center. Toggle with key "t". */
+  let useTurretCenterForThetaB = false;
   let animationRobotXY: BasePoint = { x: 0, y: 0 };
   let animationRobotHeading: number = 0;
   const ARROW_KEY_STEP_INCHES = 2;
@@ -695,23 +697,37 @@
   $: redGoalCenter = RED_ALLIANCE_RED_GOAL;
 
   // Bot-to-goal visualization: heading triangle, θ_b triangle, line from bot to goal, and arrowhead
+  // Origin for θ_b (bot or turret). Turret offset: 25% of robot height toward robot's left.
+  $: thetaBOriginPx = useTurretCenterForThetaB
+    ? (() => {
+        const rad = (robotHeading * Math.PI) / 180;
+        const offsetPx = x(robotHeight) / 4;
+        return {
+          x: robotXY.x + offsetPx * Math.sin(rad),
+          y: robotXY.y - offsetPx * Math.cos(rad),
+        };
+      })()
+    : robotXY;
+
   $: botToGoalElements = (() => {
     const gx = x(redGoalCenter.x);
     const gy = y(redGoalCenter.y);
-    const xb = x.invert(robotXY.x);
-    const yb = y.invert(robotXY.y);
+    const xb = x.invert(thetaBOriginPx.x);
+    const yb = y.invert(thetaBOriginPx.y);
     const xg = redGoalCenter.x;
     const yg = redGoalCenter.y;
     const theta_b_rad = Math.atan2(yg - yb, xg - xb);
     const theta_b_deg = (theta_b_rad * 180) / Math.PI;
 
-    // Heading: 12-inch arrow in heading direction + arc from horizontal to heading
+    // Heading: 12-inch arrow from robot center only (unchanged by turret toggle)
+    const xb_robot = x.invert(robotXY.x);
+    const yb_robot = y.invert(robotXY.y);
     const HEADING_ARROW_INCHES = 12;
     const heading_rad = (-robotHeading * Math.PI) / 180;
     const ch = Math.cos(heading_rad);
     const sh = Math.sin(heading_rad);
-    const tipX_field = xb + HEADING_ARROW_INCHES * ch;
-    const tipY_field = yb + HEADING_ARROW_INCHES * sh;
+    const tipX_field = xb_robot + HEADING_ARROW_INCHES * ch;
+    const tipY_field = yb_robot + HEADING_ARROW_INCHES * sh;
     const tipPx = x(tipX_field);
     const tipPy = y(tipY_field);
 
@@ -779,13 +795,13 @@
     headingLabel.baseline = "middle";
     headingLabel.style = "user-select: none;";
 
-    // Right triangle for θ_b: vertices at bot (x_b,y_b), (x_g,y_b), goal (x_g,y_g). Right angle at (x_g,y_b).
+    // Right triangle for θ_b: vertices at origin (bot or turret), (x_g,y_b), goal (x_g,y_g). Right angle at (x_g,y_b).
     const thetaTriangle = new Two.Path(
       [
-        new Two.Anchor(robotXY.x, robotXY.y, 0, 0, 0, 0, Two.Commands.move),
-        new Two.Anchor(gx, robotXY.y, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(thetaBOriginPx.x, thetaBOriginPx.y, 0, 0, 0, 0, Two.Commands.move),
+        new Two.Anchor(gx, thetaBOriginPx.y, 0, 0, 0, 0, Two.Commands.line),
         new Two.Anchor(gx, gy, 0, 0, 0, 0, Two.Commands.line),
-        new Two.Anchor(robotXY.x, robotXY.y, 0, 0, 0, 0, Two.Commands.close),
+        new Two.Anchor(thetaBOriginPx.x, thetaBOriginPx.y, 0, 0, 0, 0, Two.Commands.close),
       ],
       true,
     );
@@ -794,9 +810,9 @@
     thetaTriangle.linewidth = 1;
     thetaTriangle.opacity = 1;
 
-    // Label θ_b at the bot vertex (angle corner), larger font
-    const labelX = robotXY.x + (gx - robotXY.x) * 0.28;
-    const labelY = robotXY.y + (gy - robotXY.y) * 0.12;
+    // Label θ_b at the origin vertex (angle corner)
+    const labelX = thetaBOriginPx.x + (gx - thetaBOriginPx.x) * 0.28;
+    const labelY = thetaBOriginPx.y + (gy - thetaBOriginPx.y) * 0.12;
     const thetaLabel = new Two.Text(
       `θ_b = ${theta_b_deg.toFixed(1)}°`,
       labelX,
@@ -810,13 +826,13 @@
     thetaLabel.baseline = "middle";
     thetaLabel.style = "user-select: none;";
 
-    const line = new Two.Line(robotXY.x, robotXY.y, gx, gy);
+    const line = new Two.Line(thetaBOriginPx.x, thetaBOriginPx.y, gx, gy);
     line.stroke = "#dc2626";
     line.linewidth = Math.max(1.5, x(0.2));
     line.noFill();
 
-    const dx = robotXY.x - gx;
-    const dy = robotXY.y - gy;
+    const dx = thetaBOriginPx.x - gx;
+    const dy = thetaBOriginPx.y - gy;
     const len = Math.sqrt(dx * dx + dy * dy) || 1;
     const ux = dx / len;
     const uy = dy / len;
@@ -844,12 +860,13 @@
     arrowHead.linewidth = 1;
     arrowHead.opacity = 0.9;
     // Draw heading triangle and label on top so they aren’t covered by the red θ_b triangle
+    // Z-order: red line and goal arrow first, then red triangle / green arrow+arc / heading text on top
     return {
       elements: [
-        thetaTriangle,
         line,
         arrowHead,
         thetaLabel,
+        thetaTriangle,
         headingArc,
         headingArrowLine,
         headingArrowHead,
@@ -967,7 +984,7 @@
       return;
     }
 
-    two.renderer.domElement.style["z-index"] = "30";
+    two.renderer.domElement.style["z-index"] = "45";
     two.renderer.domElement.style["position"] = "absolute";
     two.renderer.domElement.style["top"] = "0px";
     two.renderer.domElement.style["left"] = "0px";
@@ -1816,6 +1833,10 @@
       event.preventDefault();
     }
   });
+  hotkeys("t", function (event) {
+    event.preventDefault();
+    useTurretCenterForThetaB = !useTurretCenterForThetaB;
+  });
   function applyTheme(theme: "light" | "dark" | "auto") {
     let actualTheme = theme;
     if (theme === "auto") {
@@ -1961,20 +1982,40 @@
         on:selectstart={(e) => e.preventDefault()}
       />
       <MathTools {x} {y} {twoElement} {robotXY} {robotHeading} />
-      <img
-        src={settings.robotImage || "/robot.png"}
-        alt="Robot"
-        style={`position: absolute; top: ${robotXY.y}px;
-left: ${robotXY.x}px; transform: translate(-50%, -50%) rotate(${robotHeading}deg); z-index: 20; width: ${x(robotWidth)}px; height: ${x(robotHeight)}px;user-select: none; -webkit-user-select: none; -moz-user-select: none;-ms-user-select: none;
-pointer-events: none;`}
-        draggable="false"
-        on:error={(e) => {
-          console.error("Failed to load robot image:", settings.robotImage);
-          e.target.src = "/robot.png"; // Fallback to default
-        }}
-        on:dragstart={(e) => e.preventDefault()}
-        on:selectstart={(e) => e.preventDefault()}
-      />
+      <!-- Robot + turret (turret offset halfway to robot left at heading 90°) -->
+      <div
+        class="robot-wrapper"
+        style="position: absolute; left: {robotXY.x}px; top: {robotXY.y}px; width: {x(robotWidth)}px; height: {x(robotHeight)}px; transform: translate(-50%, -50%) rotate({robotHeading}deg); z-index: 40; pointer-events: none;"
+      >
+        <img
+          src={settings.robotImage || "/robot.png"}
+          alt="Robot"
+          style="
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+          "
+          draggable="false"
+          on:error={(e) => {
+            console.error("Failed to load robot image:", settings.robotImage);
+            e.target.src = "/robot.png";
+          }}
+          on:dragstart={(e) => e.preventDefault()}
+          on:selectstart={(e) => e.preventDefault()}
+        />
+        <div
+          class="turret"
+          style="position: absolute; left: 50%; top: 25%; width: {Math.max(20, x(5))}px; height: {Math.max(20, x(5))}px; transform: translate(-50%, -50%); border-radius: 50%; background: #ea580c; border: 3px solid #c2410c; box-sizing: border-box; z-index: 1;"
+          aria-hidden="true"
+        />
+      </div>
     </div>
   </div>
   <ControlTab
@@ -1992,6 +2033,7 @@ pointer-events: none;`}
     bind:robotHeading
     bind:shapes
     redGoalCenter={redGoalCenter}
+    {thetaBOriginPx}
     {x}
     {y}
     {animationDuration}
