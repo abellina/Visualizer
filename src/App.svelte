@@ -865,7 +865,7 @@
     turretArrowHead.stroke = "#e5e5e5";
     turretArrowHead.linewidth = 1;
     const turretArcRadiusPx = x(2.5);
-    const turretArcStart = Math.atan2(-sh, ch);
+    const turretArcStart = Math.atan2(-sh, ch)-1.66;
     const turretArcEnd = Math.atan2(-st, ct);
     const turretArc = new Two.ArcSegment(
       turretCenterPx.x,
