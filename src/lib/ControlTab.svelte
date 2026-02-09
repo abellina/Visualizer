@@ -43,7 +43,24 @@
   export let useRedGoal: boolean = true;
   /** Origin for θ_b (bot or turret center in pixels). Used by BotToGoalSection for x_b, y_b, θ_b. */
   export let thetaBOriginPx: { x: number; y: number };
+  /** Turret center in pixels (for "turret angle to face goal" using actual turret position). */
+  export let turretCenterPx: { x: number; y: number };
   export let recordChange: () => void;
+
+  const TURRET_CENTER_DEG = 95;
+  const TURRET_MIN = 0;
+  const TURRET_MAX = 190;
+  /** Normalize desired turret angle to [0, 190]. */
+  function clampTurret(deg: number): number {
+    return Math.max(TURRET_MIN, Math.min(TURRET_MAX, deg));
+  }
+  /** Wrap angle difference to (-180, 180] for shortest turn. */
+  function wrapAngleDeg(deg: number): number {
+    let d = deg % 360;
+    if (d > 180) d -= 360;
+    if (d <= -180) d += 360;
+    return d;
+  }
 
   // Reference exported but unused props to silence Svelte unused-export warnings
 
@@ -79,6 +96,8 @@
 
   /** Turret angle (0–190°, center 95) for display. */
   export let turretAngle: number = 95;
+  /** Reset bot position to path start, heading from start point, and turret to 95°. */
+  export let resetAllPositionAndAngles: (() => void) | undefined = undefined;
 
   // θ_b: angle from origin (bot or turret) to goal
   $: theta_b_deg = (() => {
@@ -89,6 +108,31 @@
     const rad = Math.atan2(yg - yb, xg - xb);
     return (rad * 180) / Math.PI;
   })();
+
+  // Turret angle to face goal: two computation options
+  $: theta_b_from_bot_deg = (() => {
+    const xb = x.invert(robotXY.x);
+    const yb = y.invert(robotXY.y);
+    const rad = Math.atan2(goalCenter.y - yb, goalCenter.x - xb);
+    return (rad * 180) / Math.PI;
+  })();
+  $: theta_b_from_turret_deg = (() => {
+    const xt = x.invert(turretCenterPx.x);
+    const yt = y.invert(turretCenterPx.y);
+    const rad = Math.atan2(goalCenter.y - yt, goalCenter.x - xt);
+    return (rad * 180) / Math.PI;
+  })();
+  // Turret direction in field = −robotHeading − (θ_t − 95). For turret to face goal: θ_b = −robotHeading − (θ_t − 95) → θ_t = 95 − robotHeading − θ_b.
+  // So desired θ_t = 95 − (θ_b + robotHeading), wrapped so we pick shortest turn then clamp [0, 190].
+  function desiredTurretFromAngleToGoal(angleToGoalDeg: number): number {
+    const delta = wrapAngleDeg(angleToGoalDeg + robotHeading); // θ_b + θ_h (goal relative to forward)
+    return clampTurret(TURRET_CENTER_DEG - delta); // 95 − (θ_b + robotHeading) matches drawing
+  }
+  // Depend on robotHeading so desired turret updates when bot rotates (θ_b in field is unchanged but angle-from-forward changes).
+  $: desired_turret_at_bot_center = (robotHeading, desiredTurretFromAngleToGoal(theta_b_from_bot_deg));
+  $: desired_turret_at_turret_pos = (robotHeading, desiredTurretFromAngleToGoal(theta_b_from_turret_deg));
+  $: turn_to_goal_bot_center = wrapAngleDeg(desired_turret_at_bot_center - turretAngle);
+  $: turn_to_goal_turret_pos = wrapAngleDeg(desired_turret_at_turret_pos - turretAngle);
 
   // State for collapsed sections (kept for potential future use)
   let collapsedSections = {
@@ -566,16 +610,60 @@
       </ul>
     </div>
 
+    <!-- Turret angle to face goal: both computation methods with full detail -->
+    <div class="flex flex-col w-full gap-3 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-800/50">
+      <div class="font-semibold text-neutral-800 dark:text-neutral-200">
+        Turret angle to face goal
+      </div>
+      <p class="text-xs text-neutral-500 dark:text-neutral-400">
+        Turret field direction = −θ<sub>h</sub> − (θ<sub>t</sub> − 95). Set equal to θ<sub>b</sub>: desired θ<sub>t</sub> = 95 − (θ<sub>b</sub> + θ<sub>h</sub>) (wrapped to shortest turn), then clamp to [0, 190].
+      </p>
+      <div class="text-xs font-mono text-neutral-600 dark:text-neutral-400">
+        <span class="text-neutral-500">Turret angle now (θ<sub>t</sub>):</span> {turretAngle.toFixed(1)}° — same for both methods below. Turn by = desired θ<sub>t</sub> − current; + → <kbd class="px-0.5 rounded bg-neutral-200 dark:bg-neutral-600">e</kbd>, − → <kbd class="px-0.5 rounded bg-neutral-200 dark:bg-neutral-600">q</kbd>.
+      </div>
+
+      <div class="flex flex-col gap-2 text-xs">
+        <div class="rounded border border-neutral-200 dark:border-neutral-600 p-2 space-y-1">
+          <div class="font-medium text-neutral-700 dark:text-neutral-300">1) Assume turret at bot center (simplest)</div>
+          <div class="text-neutral-600 dark:text-neutral-400">
+            Angle from bot to goal (field): θ<sub>b,bot</sub> = atan2(y<sub>g</sub> − y<sub>b</sub>, x<sub>g</sub> − x<sub>b</sub>) = <span class="font-mono">{theta_b_from_bot_deg.toFixed(2)}°</span>
+          </div>
+          <div class="text-neutral-600 dark:text-neutral-400">
+            θ<sub>b,bot</sub> + θ<sub>h</sub> = {theta_b_from_bot_deg.toFixed(2)} + ({robotHeading.toFixed(1)}) = <span class="font-mono">{(theta_b_from_bot_deg + robotHeading).toFixed(1)}°</span> (wrapped). Desired θ<sub>t</sub> = 95 − (that) → <span class="font-mono font-semibold">{desired_turret_at_bot_center.toFixed(1)}°</span>. Turn by: <span class="font-mono">{turn_to_goal_bot_center >= 0 ? "+" : ""}{turn_to_goal_bot_center.toFixed(1)}°</span>
+          </div>
+        </div>
+
+        <div class="rounded border border-neutral-200 dark:border-neutral-600 p-2 space-y-1">
+          <div class="font-medium text-neutral-700 dark:text-neutral-300">2) Use actual turret position</div>
+          <div class="text-neutral-600 dark:text-neutral-400">
+            Angle from turret to goal (field): θ<sub>b,turret</sub> = atan2(y<sub>g</sub> − y<sub>t</sub>, x<sub>g</sub> − x<sub>t</sub>) = <span class="font-mono">{theta_b_from_turret_deg.toFixed(2)}°</span>
+          </div>
+          <div class="text-neutral-600 dark:text-neutral-400">
+            θ<sub>b,turret</sub> + θ<sub>h</sub> = {theta_b_from_turret_deg.toFixed(2)} + ({robotHeading.toFixed(1)}) = <span class="font-mono">{(theta_b_from_turret_deg + robotHeading).toFixed(1)}°</span> (wrapped). Desired θ<sub>t</sub> = 95 − (that) → <span class="font-mono font-semibold">{desired_turret_at_turret_pos.toFixed(1)}°</span>. Turn by: <span class="font-mono">{turn_to_goal_turret_pos >= 0 ? "+" : ""}{turn_to_goal_turret_pos.toFixed(1)}°</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="flex flex-col w-full gap-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-800/50">
       <div class="font-semibold text-neutral-800 dark:text-neutral-200">
         Move bot & turret
       </div>
+      {#if resetAllPositionAndAngles}
+        <button
+          type="button"
+          class="px-3 py-1.5 rounded bg-neutral-200 dark:bg-neutral-600 hover:bg-neutral-300 dark:hover:bg-neutral-500 text-neutral-800 dark:text-neutral-200 text-xs font-medium"
+          on:click={resetAllPositionAndAngles}
+        >
+          Reset position & angles
+        </button>
+      {/if}
       <ul class="list-disc list-inside text-xs text-neutral-600 dark:text-neutral-400 space-y-1">
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">↑↓←→</kbd> Move bot (2" step)</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">a</kbd> / <kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">d</kbd> Rotate bot left / right (1°)</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">s</kbd> Reset bot heading to 90°</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">q</kbd> / <kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">e</kbd> Rotate turret left / right (1°, 0–190°)</li>
-        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">w</kbd> Reset turret to forward (95°)</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">w</kbd> Reset position, heading & turret to path start</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">t</kbd> Use turret center for θ<sub>b</sub> (toggle)</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">Escape</kbd> Clear manual position</li>
       </ul>

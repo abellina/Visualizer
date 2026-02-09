@@ -19,7 +19,7 @@
   } from "../config";
   import FileManager from "./FileManager.svelte";
   import SettingsDialog from "./components/SettingsDialog.svelte";
-  import { calculatePathTime, formatTime } from "../utils";
+  import { calculatePathTime } from "../utils";
 
   export let startPoint: Point;
   export let lines: Line[];
@@ -30,11 +30,7 @@
   export let robotHeight: number;
   export let settings: Settings;
 
-  export let undoAction: () => any;
-  export let redoAction: () => any;
   export let recordChange: () => any;
-  export let canUndo: boolean;
-  export let canRedo: boolean;
   /** When true, red goal; when false, blue goal. Toggle button in bar. */
   export let useRedGoal: boolean = true;
 
@@ -45,8 +41,6 @@
   const gridSizeOptions = [1, 3, 6, 12, 24];
 
   $: timePrediction = calculatePathTime(startPoint, lines, settings, sequence);
-  $: elapsedSeconds = (percent / 100) * (timePrediction?.totalTime || 0);
-
   onMount(() => {
     const unsubscribeGridSize = gridSize.subscribe((value) => {
       selectedGridSize = value;
@@ -209,68 +203,6 @@
     >
       {useRedGoal ? "Red goal" : "Blue goal"}
     </button>
-
-    <div class="flex items-center gap-3">
-      <!-- time estimate -->
-      <div class="flex items-center gap-2 text-sm">
-        <div class="text-neutral-600 dark:text-neutral-300">
-            {#if timePrediction && timePrediction.totalTime > 0}
-              {formatTime(elapsedSeconds)} / {formatTime(timePrediction.totalTime)}
-            {:else}
-              {formatTime(0)} / {formatTime(0)}
-            {/if}
-        </div>
-        <div class="text-neutral-500 dark:text-neutral-400">
-            ({(timePrediction?.totalDistance ?? 0).toFixed(0)} in)
-        </div>
-      </div>
-
-      <!-- Undo / Redo -->
-      <div class="flex items-center gap-2">
-        <button
-          title="Undo"
-          on:click={undoAction}
-          disabled={!canUndo}
-          class:opacity-50={!canUndo}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            class="size-6"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 1 1 0 12h-3"
-            />
-          </svg>
-        </button>
-        <button
-          title="Redo"
-          on:click={redoAction}
-          disabled={!canRedo}
-          class:opacity-50={!canRedo}
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            class="size-6"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M15 9l6 6m0 0-6 6m6-6H9a6 6 0 1 1 0-12h3"
-            />
-          </svg>
-        </button>
-      </div>
-    </div>
 
     <!-- Divider -->
     <div
@@ -445,35 +377,6 @@
     ></div>
 
     <div class="flex items-center gap-3">
-      <!-- Delete/Reset path -->
-      <button
-        title="Delete/Reset path"
-        on:click={handleResetPathWithConfirmation}
-        class="relative group"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="2"
-          stroke="red"
-          class="size-6 stroke-red-500 hover:stroke-red-600 transition-colors"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"
-          />
-        </svg>
-
-        <!-- Tooltip for better UX -->
-        <div
-          class="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-neutral-900 text-white text-xs rounded text-center whitespace-normal max-w-[12rem] shadow-md"
-        >
-          Reset path to default (with confirmation)
-        </div>
-      </button>
-
       <!-- Settings button -->
       <button title="Open Settings" on:click={() => (settingsOpen = true)}>
         <svg

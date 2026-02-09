@@ -1052,30 +1052,6 @@
     event.preventDefault();
     saveProject();
   });
-  $: {
-    // This handles both 'travel' (movement) and 'wait' (stationary rotation) events.
-    if (timePrediction && timePrediction.timeline && lines.length > 0) {
-      const state = calculateRobotState(
-        percent,
-        timePrediction.timeline,
-        lines,
-        startPoint,
-        settings,
-        x,
-        y,
-      );
-      robotXY = { x: state.x, y: state.y };
-      robotHeading = state.heading;
-    } else {
-      // Fallback for initialization or empty state
-      robotXY = { x: x(startPoint.x), y: y(startPoint.y) };
-      // Calculate initial heading based on start point settings
-      if (startPoint.heading === "linear") robotHeading = -startPoint.startDeg;
-      else if (startPoint.heading === "constant")
-        robotHeading = -startPoint.degrees;
-      else robotHeading = 0;
-    }
-  }
 
   // Event markers removed: no runtime visualization created
 
@@ -1946,8 +1922,26 @@
   });
   hotkeys("w", function (event) {
     event.preventDefault();
-    turretAngle = TURRET_ANGLE_CENTER; // reset turret only; bot position/heading unchanged
+    resetAllPositionAndAngles();
   });
+  function resetAllPositionAndAngles() {
+    // Clear key-driven overrides so next arrow/a/d/s starts from reset position (no accumulated offset)
+    manualBotPosition = null;
+    manualHeading = null;
+    percent = 0; // so timeline-derived animationRobotXY/Heading stay at path start (reactive block overwrites them from percent)
+    const startPx = { x: x(startPoint.x), y: y(startPoint.y) };
+    const startHeading =
+      startPoint.heading === "linear"
+        ? -startPoint.startDeg
+        : startPoint.heading === "constant"
+          ? -startPoint.degrees
+          : 0;
+    animationRobotXY = startPx;
+    animationRobotHeading = startHeading;
+    robotXY = startPx;
+    robotHeading = startHeading;
+    turretAngle = TURRET_ANGLE_CENTER;
+  }
   function applyTheme(theme: "light" | "dark" | "auto") {
     let actualTheme = theme;
     if (theme === "auto") {
@@ -2022,11 +2016,7 @@
   bind:robotHeight
   bind:useRedGoal
   {percent}
-  {undoAction}
-  {redoAction}
   {recordChange}
-  {canUndo}
-  {canRedo}
 />
 <!--   {saveFile} -->
 <div
@@ -2149,7 +2139,9 @@
     goalCenter={goalCenter}
     bind:useRedGoal
     {thetaBOriginPx}
+    {turretCenterPx}
     {turretAngle}
+    {resetAllPositionAndAngles}
     {x}
     {y}
     {animationDuration}
