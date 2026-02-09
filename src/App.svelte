@@ -64,6 +64,11 @@
   // Browser-only build: file operations use the browser file store and
   // localStorage. Electron-specific APIs have been removed.
 
+  const baseUrl = (import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/");
+  function assetUrl(path: string): string {
+    return baseUrl + (path || "").replace(/^\//, "");
+  }
+
   function normalizeLines(input: Line[]): Line[] {
     return (input || []).map((line) => ({
       ...line,
@@ -2052,8 +2057,8 @@
     >
       <img
         src={settings.fieldMap
-          ? `/fields/${settings.fieldMap}`
-          : "/fields/decode.webp"}
+          ? assetUrl(`fields/${settings.fieldMap}`)
+          : assetUrl("fields/decode.webp")}
         alt="Field"
         class="absolute top-0 left-0 w-full h-full rounded-lg z-10"
         style="
@@ -2074,7 +2079,7 @@
         draggable="false"
         on:error={(e) => {
           console.error("Failed to load field map:", settings.fieldMap);
-          e.target.src = "/fields/decode.webp"; // Fallback
+          e.target.src = assetUrl("fields/decode.webp");
         }}
         on:dragstart={(e) => e.preventDefault()}
         on:selectstart={(e) => e.preventDefault()}
@@ -2086,7 +2091,7 @@
         style="position: absolute; left: {robotXY.x}px; top: {robotXY.y}px; width: {x(robotWidth)}px; height: {x(robotHeight)}px; transform: translate(-50%, -50%) rotate({robotHeading}deg); z-index: 40; pointer-events: none;"
       >
         <img
-          src={settings.robotImage || "/robot.png"}
+          src={assetUrl(settings.robotImage || "robot.png")}
           alt="Robot"
           style="
             position: absolute;
@@ -2103,7 +2108,7 @@
           draggable="false"
           on:error={(e) => {
             console.error("Failed to load robot image:", settings.robotImage);
-            e.target.src = "/robot.png";
+            e.target.src = assetUrl("robot.png");
           }}
           on:dragstart={(e) => e.preventDefault()}
           on:selectstart={(e) => e.preventDefault()}

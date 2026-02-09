@@ -19,27 +19,28 @@ code.hljs {
   @apply rounded-md max-h-[42rem] overflow-scroll;
 }
 
+/* Relative to built CSS (dist/assets/) so fonts work with any base path */
 @font-face {
   font-family: "Poppins";
-  src: url("/fonts/Poppins-ExtraLight.ttf") format("truetype");
+  src: url("../fonts/Poppins-ExtraLight.ttf") format("truetype");
   font-weight: 200;
 }
 
 @font-face {
   font-family: "Poppins";
-  src: url("/fonts/Poppins-Light.ttf") format("truetype");
+  src: url("../fonts/Poppins-Light.ttf") format("truetype");
   font-weight: 300;
 }
 
 @font-face {
   font-family: "Poppins";
-  src: url("/fonts/Poppins-Regular.ttf") format("truetype");
+  src: url("../fonts/Poppins-Regular.ttf") format("truetype");
   font-weight: 400;
 }
 
 @font-face {
   font-family: "Poppins";
-  src: url("/fonts/Poppins-SemiBold.ttf") format("truetype");
+  src: url("../fonts/Poppins-SemiBold.ttf") format("truetype");
   font-weight: 600;
 }
 

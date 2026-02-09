@@ -8,6 +8,11 @@
   export let isOpen = false;
   export let settings: Settings;
 
+  const baseUrl = (import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/");
+  function assetUrl(path: string): string {
+    return baseUrl + (path || "").replace(/^\//, "");
+  }
+
   // Track which sections are collapsed
   let collapsedSections = {
     robot: true,
@@ -279,7 +284,7 @@
                     class="relative w-20 h-20 border-2 border-neutral-300 dark:border-neutral-600 rounded-md overflow-hidden bg-white dark:bg-neutral-900"
                   >
                     <img
-                      src={settings.robotImage || "/robot.png"}
+                      src={assetUrl(settings.robotImage || "robot.png")}
                       alt="Robot Preview"
                       class="w-full h-full object-contain"
                       on:error={(e) => {
@@ -287,7 +292,7 @@
                           "Failed to load robot image:",
                           settings.robotImage,
                         );
-                        e.target.src = "/robot.png"; // Fallback
+                        e.target.src = assetUrl("robot.png");
                       }}
                     />
                     {#if settings.robotImage && settings.robotImage !== "/robot.png"}
