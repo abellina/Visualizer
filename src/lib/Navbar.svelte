@@ -19,8 +19,6 @@
   } from "../config";
   import FileManager from "./FileManager.svelte";
   import SettingsDialog from "./components/SettingsDialog.svelte";
-  import { calculatePathTime } from "../utils";
-
   export let startPoint: Point;
   export let lines: Line[];
   export let shapes: Shape[];
@@ -40,7 +38,6 @@
   let selectedGridSize = 12;
   const gridSizeOptions = [1, 3, 6, 12, 24];
 
-  $: timePrediction = calculatePathTime(startPoint, lines, settings, sequence);
   onMount(() => {
     const unsubscribeGridSize = gridSize.subscribe((value) => {
       selectedGridSize = value;
