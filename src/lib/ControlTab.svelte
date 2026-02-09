@@ -75,7 +75,10 @@
   })();
 
 
-  // State for collapsed sections
+  /** Turret angle (0–190°, center 95) for display. */
+  export let turretAngle: number = 95;
+
+  // State for collapsed sections (kept for potential future use)
   let collapsedSections = {
     obstacles: shapes.map(() => true),
     lines: lines.map(() => false),
@@ -520,10 +523,8 @@
 
 <div class="flex-1 flex flex-col justify-start items-center gap-2 h-full">
   <div
-    class="flex flex-col justify-start items-start w-full rounded-lg bg-neutral-50 dark:bg-neutral-900 shadow-md p-4 overflow-y-scroll overflow-x-hidden h-full gap-6"
+    class="flex flex-col justify-start items-start w-full rounded-lg bg-neutral-50 dark:bg-neutral-900 shadow-md p-4 overflow-y-scroll overflow-x-hidden flex-1 min-h-0 gap-6 border border-neutral-200 dark:border-neutral-700"
   >
-    <ObstaclesSection bind:shapes bind:collapsedObstacles />
-
     <RobotPositionDisplay {robotXY} {robotHeading} {x} {y} />
 
     <BotToGoalSection
@@ -534,143 +535,30 @@
       goalLabel="Red Alliance Red Goal"
     />
 
-    <StartingPointSection bind:startPoint {addPathAtStart} {addWaitAtStart} />
-
-    <!-- Unified sequence render: paths and waits -->
-    {#each sequence as item, sIdx}
-      <div class="w-full">
-        {#if item.kind === "path"}
-          {#each lines.filter((l) => l.id === item.lineId) as ln (ln.id)}
-            <PathLineSection
-              bind:line={ln}
-              idx={lines.findIndex((l) => l.id === ln.id)}
-              bind:lines
-              bind:collapsed={
-                collapsedSections.lines[lines.findIndex((l) => l.id === ln.id)]
-              }
-              bind:collapsedControlPoints={
-                collapsedSections.controlPoints[
-                  lines.findIndex((l) => l.id === ln.id)
-                ]
-              }
-              onRemove={() =>
-                removeLine(lines.findIndex((l) => l.id === ln.id))}
-              onInsertAfter={() => addControlPointToLine(sIdx)}
-              onInsertMidpoint={() => insertMidpointAfter(sIdx)}
-              onAddWaitAfter={() => insertWaitAfter(sIdx)}
-              onMoveUp={() => moveSequenceItem(sIdx, -1)}
-              onMoveDown={() => moveSequenceItem(sIdx, 1)}
-              canMoveUp={sIdx !== 0}
-              canMoveDown={sIdx !== sequence.length - 1}
-              optimizeLine={optimizeLine}
-              optimizing={optimizingLineIds?.[ln.id ?? ""] ?? false}
-              {recordChange}
-            />
-          {/each}
-        {:else}
-          <WaitRow
-            name={getWait(item).name}
-            durationMs={getWait(item).durationMs}
-            locked={getWait(item).locked ?? false}
-            onToggleLock={() => {
-              const newSeq = [...sequence];
-              newSeq[sIdx] = {
-                ...getWait(item),
-                locked: !(getWait(item).locked ?? false),
-              };
-              sequence = newSeq;
-              recordChange?.();
-            }}
-            onChange={(newName, newDuration) => {
-              const newSeq = [...sequence];
-              newSeq[sIdx] = {
-                ...getWait(item),
-                name: newName,
-                durationMs: Math.max(0, Number(newDuration) || 0),
-              };
-              sequence = newSeq;
-            }}
-            onRemove={() => {
-              const newSeq = [...sequence];
-              newSeq.splice(sIdx, 1);
-              sequence = newSeq;
-            }}
-            onInsertAfter={() => {
-              const newSeq = [...sequence];
-              newSeq.splice(sIdx + 1, 0, {
-                kind: "wait",
-                id: makeId(),
-                name: "Wait",
-                durationMs: 0,
-                locked: false,
-              });
-              sequence = newSeq;
-            }}
-            onAddPathAfter={() => insertPathAfter(sIdx)}
-            onMoveUp={() => moveSequenceItem(sIdx, -1)}
-            onMoveDown={() => moveSequenceItem(sIdx, 1)}
-            canMoveUp={sIdx !== 0}
-            canMoveDown={sIdx !== sequence.length - 1}
-          />
-        {/if}
+    <!-- θ_h (heading) and θ_t (turret) -->
+    <div class="flex flex-col w-full gap-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-800/50">
+      <div class="font-semibold text-neutral-800 dark:text-neutral-200">Angles</div>
+      <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-xs">
+        <span class="text-neutral-500 dark:text-neutral-400">θ_h</span>
+        <span>{(-robotHeading).toFixed(1)}° (heading)</span>
+        <span class="text-neutral-500 dark:text-neutral-400">θ_t</span>
+        <span>{turretAngle.toFixed(1)}° (turret, 0–190)</span>
       </div>
-    {/each}
+    </div>
 
-    <!-- Add Line Button -->
-    <div class="flex flex-row items-center gap-4">
-      <button
-        on:click={addLine}
-        class="font-semibold text-green-500 text-sm flex flex-row justify-start items-center gap-1"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width={2}
-          stroke="currentColor"
-          class="size-5"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M12 4.5v15m7.5-7.5h-15"
-          />
-        </svg>
-        <p>Add Path</p>
-      </button>
-
-      <button
-        on:click={addWait}
-        class="font-semibold text-amber-500 text-sm flex flex-row justify-start items-center gap-1"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          class="size-5"
-        >
-          <circle cx="12" cy="12" r="9" />
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M12 7v5l3 2"
-          />
-        </svg>
-        <p>Add Wait</p>
-      </button>
+    <div class="flex flex-col w-full gap-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-800/50">
+      <div class="font-semibold text-neutral-800 dark:text-neutral-200">
+        Move bot & turret
+      </div>
+      <ul class="list-disc list-inside text-xs text-neutral-600 dark:text-neutral-400 space-y-1">
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">↑↓←→</kbd> Move bot (2" step)</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">a</kbd> / <kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">d</kbd> Rotate bot left / right (1°)</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">s</kbd> Reset bot heading to 90°</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">q</kbd> / <kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">e</kbd> Rotate turret left / right (1°, 0–190°)</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">w</kbd> Turret forward (95°)</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">t</kbd> Use turret center for θ_b (toggle)</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">Escape</kbd> Clear manual position</li>
+      </ul>
     </div>
   </div>
-
-  <PlaybackControls
-    bind:playing
-    {play}
-    {pause}
-    bind:percent
-    {handleSeek}
-    bind:loopAnimation
-    {markers}
-    totalTime={timePrediction?.totalTime ?? 0}
-  />
 </div>

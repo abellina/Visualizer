@@ -99,6 +99,11 @@
   let manualHeading: number | null = null;
   /** When true, θ_b triangle and bot-to-goal line use turret center instead of bot center. Toggle with key "t". */
   let useTurretCenterForThetaB = false;
+  /** Turret angle in bot frame: 0–190°, center (forward) = 95°. q/e rotate, w recenter. */
+  const TURRET_ANGLE_MIN = 0;
+  const TURRET_ANGLE_MAX = 190;
+  const TURRET_ANGLE_CENTER = 95;
+  let turretAngle = TURRET_ANGLE_CENTER;
   let animationRobotXY: BasePoint = { x: 0, y: 0 };
   let animationRobotHeading: number = 0;
   const ARROW_KEY_STEP_INCHES = 2;
@@ -696,18 +701,18 @@
   // Vector ends at this point.
   $: redGoalCenter = RED_ALLIANCE_RED_GOAL;
 
-  // Bot-to-goal visualization: heading triangle, θ_b triangle, line from bot to goal, and arrowhead
+  // Turret center in pixels (same offset as when θ_b uses turret: 25% robot height toward robot's left).
+  $: turretCenterPx = (() => {
+    const rad = (robotHeading * Math.PI) / 180;
+    const offsetPx = x(robotHeight) / 4;
+    return {
+      x: robotXY.x + offsetPx * Math.sin(rad),
+      y: robotXY.y - offsetPx * Math.cos(rad),
+    };
+  })();
+
   // Origin for θ_b (bot or turret). Turret offset: 25% of robot height toward robot's left.
-  $: thetaBOriginPx = useTurretCenterForThetaB
-    ? (() => {
-        const rad = (robotHeading * Math.PI) / 180;
-        const offsetPx = x(robotHeight) / 4;
-        return {
-          x: robotXY.x + offsetPx * Math.sin(rad),
-          y: robotXY.y - offsetPx * Math.cos(rad),
-        };
-      })()
-    : robotXY;
+  $: thetaBOriginPx = useTurretCenterForThetaB ? turretCenterPx : robotXY;
 
   $: botToGoalElements = (() => {
     const gx = x(redGoalCenter.x);
@@ -776,14 +781,14 @@
     headingArc.stroke = "#16a34a";
     headingArc.linewidth = Math.max(2.5, x(0.25));
 
-    const heading_deg = -robotHeading;
+    const theta_h_deg = -robotHeading;
     const arcMidAngle = (arcStartAngle + arcEndAngle) / 2;
     const labelRadius = arcRadiusPx * 1.4;
     const headingLabelX = robotXY.x + Math.cos(arcMidAngle) * labelRadius;
     const headingLabelY = robotXY.y - Math.sin(arcMidAngle) * labelRadius;
     const angleFontSize = Math.max(18, x(3));
     const headingLabel = new Two.Text(
-      `heading = ${heading_deg.toFixed(1)}°`,
+      `θ_h = ${theta_h_deg.toFixed(1)}°`,
       headingLabelX,
       headingLabelY,
       { size: angleFontSize, leading: angleFontSize },
@@ -794,6 +799,77 @@
     headingLabel.alignment = "center";
     headingLabel.baseline = "middle";
     headingLabel.style = "user-select: none;";
+
+    // θ_t: turret angle (white). W.r.t. bot: 0–190°, center 95° = forward. Direction = robotHeading + (turretAngle - 95).
+    const turretDirInFieldDeg = robotHeading + (turretAngle - TURRET_ANGLE_CENTER);
+    const turret_rad = (-turretDirInFieldDeg * Math.PI) / 180;
+    const ct = Math.cos(turret_rad);
+    const st = Math.sin(turret_rad);
+    const TURRET_ARROW_INCHES = 6;
+    const turretTipX_field = x.invert(turretCenterPx.x) + TURRET_ARROW_INCHES * ct;
+    const turretTipY_field = y.invert(turretCenterPx.y) + TURRET_ARROW_INCHES * st;
+    const turretTipPx = x(turretTipX_field);
+    const turretTipPy = y(turretTipY_field);
+    const turretArrowLine = new Two.Line(turretCenterPx.x, turretCenterPx.y, turretTipPx, turretTipPy);
+    turretArrowLine.stroke = "#ffffff";
+    turretArrowLine.linewidth = Math.max(1.5, x(0.15));
+    turretArrowLine.noFill();
+    const tArrDx = turretTipPx - turretCenterPx.x;
+    const tArrDy = turretTipPy - turretCenterPx.y;
+    const tArrLen = Math.sqrt(tArrDx * tArrDx + tArrDy * tArrDy) || 1;
+    const tArrUx = tArrDx / tArrLen;
+    const tArrUy = tArrDy / tArrLen;
+    const tHeadLen = Math.max(6, x(0.6));
+    const tHeadW = Math.max(3, x(0.3));
+    const tBack1X = turretTipPx - tArrUx * tHeadLen + tArrUy * tHeadW;
+    const tBack1Y = turretTipPy - tArrUy * tHeadLen - tArrUx * tHeadW;
+    const tBack2X = turretTipPx - tArrUx * tHeadLen - tArrUy * tHeadW;
+    const tBack2Y = turretTipPy - tArrUy * tHeadLen + tArrUx * tHeadW;
+    const turretArrowHead = new Two.Path(
+      [
+        new Two.Anchor(turretTipPx, turretTipPy, 0, 0, 0, 0, Two.Commands.move),
+        new Two.Anchor(tBack1X, tBack1Y, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(tBack2X, tBack2Y, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(turretTipPx, turretTipPy, 0, 0, 0, 0, Two.Commands.close),
+      ],
+      true,
+    );
+    turretArrowHead.fill = "#ffffff";
+    turretArrowHead.stroke = "#e5e5e5";
+    turretArrowHead.linewidth = 1;
+    const turretArcRadiusPx = x(2.5);
+    const turretArcStart = Math.atan2(-sh, ch);
+    const turretArcEnd = Math.atan2(-st, ct);
+    const turretArc = new Two.ArcSegment(
+      turretCenterPx.x,
+      turretCenterPx.y,
+      0,
+      turretArcRadiusPx,
+      turretArcStart,
+      turretArcEnd,
+      24,
+    );
+    turretArc.noFill();
+    turretArc.stroke = "#ffffff";
+    turretArc.linewidth = Math.max(1.5, x(0.2));
+    const theta_t_deg = turretAngle;
+    const turretArcMid = (turretArcStart + turretArcEnd) / 2;
+    const turretLabelRadius = turretArcRadiusPx * 1.3;
+    const turretLabelX = turretCenterPx.x + Math.cos(turretArcMid) * turretLabelRadius;
+    const turretLabelY = turretCenterPx.y - Math.sin(turretArcMid) * turretLabelRadius;
+    const turretFontSize = Math.max(14, x(2.2));
+    const turretLabel = new Two.Text(
+      `θ_t = ${theta_t_deg.toFixed(1)}°`,
+      turretLabelX,
+      turretLabelY,
+      { size: turretFontSize, leading: turretFontSize },
+    );
+    turretLabel.fill = "#ffffff";
+    turretLabel.family = "ui-sans-serif, system-ui, sans-serif";
+    turretLabel.weight = "700";
+    turretLabel.alignment = "center";
+    turretLabel.baseline = "middle";
+    turretLabel.style = "user-select: none;";
 
     // Right triangle for θ_b: vertices at origin (bot or turret), (x_g,y_b), goal (x_g,y_g). Right angle at (x_g,y_b).
     const thetaTriangle = new Two.Path(
@@ -860,7 +936,7 @@
     arrowHead.linewidth = 1;
     arrowHead.opacity = 0.9;
     // Draw heading triangle and label on top so they aren’t covered by the red θ_b triangle
-    // Z-order: red line and goal arrow first, then red triangle / green arrow+arc / heading text on top
+    // Z-order: red line and goal arrow first, then red triangle / green θ_h / white θ_t on top
     return {
       elements: [
         line,
@@ -871,6 +947,10 @@
         headingArrowLine,
         headingArrowHead,
         headingLabel,
+        turretArc,
+        turretArrowLine,
+        turretArrowHead,
+        turretLabel,
       ],
     };
   })();
@@ -1000,8 +1080,7 @@
     if (onionLayerElements.length > 0) {
       two.add(...onionLayerElements);
     }
-    two.add(...path);
-    two.add(...points);
+    // Path building disabled: only move bot & turret mode; paths not drawn
     two.add(...botToGoalElements.elements);
 
     two.update();
@@ -1837,6 +1916,18 @@
     event.preventDefault();
     useTurretCenterForThetaB = !useTurretCenterForThetaB;
   });
+  hotkeys("q", function (event) {
+    event.preventDefault();
+    turretAngle = Math.max(TURRET_ANGLE_MIN, turretAngle - 1);
+  });
+  hotkeys("e", function (event) {
+    event.preventDefault();
+    turretAngle = Math.min(TURRET_ANGLE_MAX, turretAngle + 1);
+  });
+  hotkeys("w", function (event) {
+    event.preventDefault();
+    turretAngle = TURRET_ANGLE_CENTER;
+  });
   function applyTheme(theme: "light" | "dark" | "auto") {
     let actualTheme = theme;
     if (theme === "auto") {
@@ -2034,6 +2125,7 @@
     bind:shapes
     redGoalCenter={redGoalCenter}
     {thetaBOriginPx}
+    {turretAngle}
     {x}
     {y}
     {animationDuration}
