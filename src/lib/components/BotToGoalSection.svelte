@@ -21,15 +21,9 @@
   <div class="font-semibold text-neutral-800 dark:text-neutral-200">
     Bot to Goal — {goalLabel}
   </div>
-  <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-xs">
-    <span class="text-neutral-500 dark:text-neutral-400">x<sub>b</sub></span>
-    <span>{xb.toFixed(3)} in</span>
-    <span class="text-neutral-500 dark:text-neutral-400">y<sub>b</sub></span>
-    <span>{yb.toFixed(3)} in</span>
-    <span class="text-neutral-500 dark:text-neutral-400">x<sub>g</sub></span>
-    <span>{xg.toFixed(3)} in</span>
-    <span class="text-neutral-500 dark:text-neutral-400">y<sub>g</sub></span>
-    <span>{yg.toFixed(3)} in</span>
+  <div class="font-mono text-xs text-neutral-700 dark:text-neutral-300 flex flex-col gap-0.5">
+    <div>(x<sub>b</sub>, y<sub>b</sub>) = ({xb.toFixed(3)}, {yb.toFixed(3)}) in</div>
+    <div>(x<sub>g</sub>, y<sub>g</sub>) = ({xg.toFixed(3)}, {yg.toFixed(3)}) in</div>
   </div>
   <ul class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 space-y-0.5 list-none pl-0">
     <li><strong>x<sub>b</sub>, y<sub>b</sub></strong> = origin position in field (in) — bot or turret when <kbd class="px-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">T</kbd> toggled</li>
