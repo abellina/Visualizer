@@ -38,7 +38,9 @@
   export let optimizingLineIds: Record<string, boolean> = {};
 
   export let shapes: Shape[];
-  export let redGoalCenter: { x: number; y: number };
+  export let goalCenter: { x: number; y: number };
+  /** When true, red goal; when false, blue goal. Toggle with button. */
+  export let useRedGoal: boolean = true;
   /** Origin for θ_b (bot or turret center in pixels). Used by BotToGoalSection for x_b, y_b, θ_b. */
   export let thetaBOriginPx: { x: number; y: number };
   export let recordChange: () => void;
@@ -77,6 +79,16 @@
 
   /** Turret angle (0–190°, center 95) for display. */
   export let turretAngle: number = 95;
+
+  // θ_b: angle from origin (bot or turret) to goal
+  $: theta_b_deg = (() => {
+    const xb = x.invert(thetaBOriginPx.x);
+    const yb = y.invert(thetaBOriginPx.y);
+    const xg = goalCenter.x;
+    const yg = goalCenter.y;
+    const rad = Math.atan2(yg - yb, xg - xb);
+    return (rad * 180) / Math.PI;
+  })();
 
   // State for collapsed sections (kept for potential future use)
   let collapsedSections = {
@@ -531,19 +543,27 @@
       originXY={thetaBOriginPx}
       {x}
       {y}
-      goal={redGoalCenter}
-      goalLabel="Red Alliance Red Goal"
+      goal={goalCenter}
+      goalLabel={useRedGoal ? "Red Alliance Red Goal" : "Blue Alliance Blue Goal"}
     />
 
-    <!-- θ_h (heading) and θ_t (turret) -->
+    <!-- Angles: θₕ, θₜ, θᵦ with definitions -->
     <div class="flex flex-col w-full gap-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-800/50">
       <div class="font-semibold text-neutral-800 dark:text-neutral-200">Angles</div>
       <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-xs">
-        <span class="text-neutral-500 dark:text-neutral-400">θ_h</span>
-        <span>{(-robotHeading).toFixed(1)}° (heading)</span>
-        <span class="text-neutral-500 dark:text-neutral-400">θ_t</span>
-        <span>{turretAngle.toFixed(1)}° (turret, 0–190)</span>
+        <span class="text-neutral-500 dark:text-neutral-400">θ<sub>h</sub></span>
+        <span>{(-robotHeading).toFixed(1)}°</span>
+        <span class="text-neutral-500 dark:text-neutral-400">θ<sub>t</sub></span>
+        <span>{turretAngle.toFixed(1)}°</span>
+        <span class="text-neutral-500 dark:text-neutral-400">θ<sub>b</sub></span>
+        <span>{theta_b_deg.toFixed(2)}°</span>
       </div>
+      <ul class="text-xs text-neutral-500 dark:text-neutral-400 mt-1 space-y-0.5 list-none pl-0">
+        <li><strong>θ<sub>h</sub></strong> = heading (bot forward)</li>
+        <li><strong>θ<sub>t</sub></strong> = turret angle in bot frame (0–190°, 95 = forward)</li>
+        <li><strong>θ<sub>b</sub></strong> = angle from origin to goal</li>
+        <li>Press <kbd class="px-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">T</kbd> to use turret center for θ<sub>b</sub></li>
+      </ul>
     </div>
 
     <div class="flex flex-col w-full gap-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-800/50">
@@ -556,7 +576,7 @@
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">s</kbd> Reset bot heading to 90°</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">q</kbd> / <kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">e</kbd> Rotate turret left / right (1°, 0–190°)</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">w</kbd> Turret forward (95°)</li>
-        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">t</kbd> Use turret center for θ_b (toggle)</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">t</kbd> Use turret center for θ<sub>b</sub> (toggle)</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">Escape</kbd> Clear manual position</li>
       </ul>
     </div>

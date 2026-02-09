@@ -15,9 +15,6 @@
   $: xg = goal.x;
   $: yg = goal.y;
 
-  // θ_b: angle from bot to goal (radians). atan2(dy, dx) = angle from positive X-axis toward goal.
-  $: theta_b_rad = Math.atan2(yg - yb, xg - xb);
-  $: theta_b_deg = (theta_b_rad * 180) / Math.PI;
 </script>
 
 <div class="flex flex-col w-full justify-start items-start gap-2 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-800/50">
@@ -33,13 +30,9 @@
     <span>{xg.toFixed(3)} in</span>
     <span class="text-neutral-500 dark:text-neutral-400">y<sub>g</sub></span>
     <span>{yg.toFixed(3)} in</span>
-    <span class="text-neutral-500 dark:text-neutral-400">θ<sub>b</sub></span>
-    <span>
-      {theta_b_rad.toFixed(4)} rad
-      ({theta_b_deg.toFixed(2)}°)
-    </span>
   </div>
-  <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-    θ<sub>b</sub> = angle from origin to goal. Press <kbd>T</kbd> to use turret center.
-  </p>
+  <ul class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5 space-y-0.5 list-none pl-0">
+    <li><strong>x<sub>b</sub>, y<sub>b</sub></strong> = origin position in field (in) — bot or turret when <kbd class="px-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">T</kbd> toggled</li>
+    <li><strong>x<sub>g</sub>, y<sub>g</sub></strong> = goal position in field (in)</li>
+  </ul>
 </div>

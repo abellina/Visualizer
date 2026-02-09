@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Point, Line, Shape, Settings, SequenceItem } from "../types";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import {
     showRuler,
     showProtractor,
@@ -19,10 +19,7 @@
   } from "../config";
   import FileManager from "./FileManager.svelte";
   import SettingsDialog from "./components/SettingsDialog.svelte";
-  import ExportCodeDialog from "./components/ExportCodeDialog.svelte";
   import { calculatePathTime, formatTime } from "../utils";
-
-  export let loadFile: (evt: any) => any;
 
   export let startPoint: Point;
   export let lines: Line[];
@@ -33,40 +30,19 @@
   export let robotHeight: number;
   export let settings: Settings;
 
-  export let saveProject: () => any;
-  export let saveFileAs: () => any;
   export let undoAction: () => any;
   export let redoAction: () => any;
   export let recordChange: () => any;
   export let canUndo: boolean;
   export let canRedo: boolean;
-  export let optimizeAllLines: () => Promise<void>;
-  export let optimizingAll: boolean = false;
+  /** When true, red goal; when false, blue goal. Toggle button in bar. */
+  export let useRedGoal: boolean = true;
 
   let fileManagerOpen = false;
   let settingsOpen = false;
-  let exportMenuOpen = false;
-  let exportDialogOpen = false;
-  let exportDialog: ExportCodeDialog;
-  // Hide sequential export UI by default; backend generator remains available
-  const showSequentialExport = false;
-
-  let saveDropdownOpen = false;
-  let saveDropdownRef: HTMLElement;
-  let saveButtonRef: HTMLElement;
 
   let selectedGridSize = 12;
   const gridSizeOptions = [1, 3, 6, 12, 24];
-
-  // Ensure File Manager and Export dialog are mutually exclusive
-  $: if (fileManagerOpen && exportDialogOpen) {
-    exportDialogOpen = false;
-  }
-
-  // Ensure save dropdown and export menu are mutually exclusive
-  $: if (saveDropdownOpen && exportMenuOpen) {
-    exportMenuOpen = false;
-  }
 
   $: timePrediction = calculatePathTime(startPoint, lines, settings, sequence);
   $: elapsedSeconds = (percent / 100) * (timePrediction?.totalTime || 0);
@@ -100,12 +76,6 @@
         gridSize.set(selectedGridSize);
       }
     }
-  }
-
-  function handleExport(format: "java" | "points" | "sequential") {
-    exportMenuOpen = false;
-    fileManagerOpen = false; // ensure file manager is closed before opening export dialog
-    exportDialog.openWithFormat(format);
   }
 
   function resetPath() {
@@ -151,65 +121,6 @@
     settings.rWidth = robotWidth;
   }
 
-  function handleClickOutside(event: MouseEvent) {
-    if (
-      saveDropdownOpen &&
-      saveDropdownRef &&
-      !saveDropdownRef.contains(event.target as Node) &&
-      saveButtonRef &&
-      !saveButtonRef.contains(event.target as Node)
-    ) {
-      saveDropdownOpen = false;
-    }
-  }
-
-  // Handle Escape key to close dropdown
-  function handleKeyDown(event: KeyboardEvent) {
-    if (saveDropdownOpen && event.key === "Escape") {
-      saveDropdownOpen = false;
-    }
-  }
-
-  onMount(() => {
-    document.addEventListener("click", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
-  });
-
-  onDestroy(() => {
-    document.removeEventListener("click", handleClickOutside);
-    document.removeEventListener("keydown", handleKeyDown);
-  });
-
-  type GlowButtonEl = HTMLElement & { dataset: DOMStringMap & { prevOverflow?: string } };
-
-  function handleOptimizeEnter(event: MouseEvent) {
-    const el = event.currentTarget as GlowButtonEl;
-    el.style.background =
-      "linear-gradient(120deg, #ff5f6d, #ffc371, #47e1a8, #5f8bff, #c471ed, #f64f59)";
-    el.style.backgroundSize = "400% 400%";
-    el.style.animation = "rainbow-glow 1.2s ease infinite";
-    el.style.boxShadow =
-      "0 0 18px rgba(255,255,255,0.9), 0 0 40px rgba(255,255,255,0.45)";
-    el.dataset.prevOverflow = el.style.overflow;
-    el.style.overflow = "hidden";
-  }
-
-  function handleOptimizeMove(event: MouseEvent) {
-    const el = event.currentTarget as GlowButtonEl;
-    const rect = el.getBoundingClientRect();
-    const xPct = ((event.clientX - rect.left) / rect.width) * 100;
-    const yPct = ((event.clientY - rect.top) / rect.height) * 100;
-    el.style.backgroundPosition = `${xPct}% ${yPct}%`;
-  }
-
-  function handleOptimizeLeave(event: MouseEvent) {
-    const el = event.currentTarget as GlowButtonEl;
-    el.style.background = "";
-    el.style.backgroundPosition = "";
-    el.style.animation = "";
-    el.style.boxShadow = "0 0 8px rgba(255,255,255,0.2)";
-    el.style.overflow = el.dataset.prevOverflow || "hidden";
-  }
 </script>
 
 {#if fileManagerOpen}
@@ -222,14 +133,6 @@
   />
 {/if}
 
-<ExportCodeDialog
-  bind:this={exportDialog}
-  bind:isOpen={exportDialogOpen}
-  bind:startPoint
-  bind:lines
-  bind:sequence
-/>
-
 <SettingsDialog bind:isOpen={settingsOpen} bind:settings />
 
 <div
@@ -241,10 +144,7 @@
       <!-- File manager button -->
       <button
         title="File Manager"
-        on:click={() => {
-          exportDialogOpen = false;
-          fileManagerOpen = true;
-        }}
+        on:click={() => (fileManagerOpen = true)}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -262,7 +162,7 @@
         </svg>
       </button>
 
-      <span>Pedro Pathing Visualizer</span>
+      <span>Ctrl-X Angle Visualizer (based on Pedro Pathing Visualizer)</span>
       <!-- GitHub Repo Link (moved next to title) -->
       <a
         target="_blank"
@@ -298,6 +198,18 @@
 
   <!-- Actions -->
   <div class="flex flex-row justify-end items-center gap-4">
+    <!-- Goal toggle: red / blue -->
+    <button
+      type="button"
+      title={useRedGoal ? "Red goal (click for blue)" : "Blue goal (click for red)"}
+      on:click={() => (useRedGoal = !useRedGoal)}
+      class="px-3 py-1.5 text-sm font-semibold rounded border-2 transition-colors {useRedGoal
+        ? 'bg-red-500/90 border-red-600 text-white hover:bg-red-600'
+        : 'bg-blue-500/90 border-blue-600 text-white hover:bg-blue-600'}"
+    >
+      {useRedGoal ? "Red goal" : "Blue goal"}
+    </button>
+
     <div class="flex items-center gap-3">
       <!-- time estimate -->
       <div class="flex items-center gap-2 text-sm">
@@ -312,19 +224,6 @@
             ({(timePrediction?.totalDistance ?? 0).toFixed(0)} in)
         </div>
       </div>
-
-      <button
-        class="relative px-3 py-1.5 text-sm font-semibold text-neutral-700 dark:text-neutral-200 bg-neutral-200/80 dark:bg-neutral-800/80 border border-neutral-300 dark:border-neutral-700 rounded-full shadow-sm hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Optimize all paths"
-        on:click={optimizeAllLines}
-        disabled={optimizingAll}
-        style="box-shadow: 0 0 8px rgba(255,255,255,0.2)"
-        on:mouseenter={handleOptimizeEnter}
-        on:mousemove={handleOptimizeMove}
-        on:mouseleave={handleOptimizeLeave}
-      >
-        {optimizingAll ? "Optimizing All…" : "Optimize All"}
-      </button>
 
       <!-- Undo / Redo -->
       <div class="flex items-center gap-2">
@@ -540,227 +439,6 @@
       </svg>
     </button>
 
-    <!-- Divider -->
-    <div
-      class="h-6 border-l border-neutral-300 dark:border-neutral-700 mx-4"
-      aria-hidden="true"
-    ></div>
-
-    <div class="flex items-center gap-3">
-      <!-- Load trajectory from file -->
-      <input
-        id="file-input"
-        type="file"
-        accept=".pp"
-        on:change={loadFile}
-        class="hidden"
-      />
-      <label
-        for="file-input"
-        title="Load trajectory from a .pp file"
-        class="cursor-pointer"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke-width="2"
-          stroke="currentColor"
-          class="size-6"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"
-          />
-        </svg>
-      </label>
-
-      <!-- Save dropdown -->
-      <div class="relative">
-        <button
-          bind:this={saveButtonRef}
-          title="Save options"
-          on:click={() => (saveDropdownOpen = !saveDropdownOpen)}
-          class="flex items-center gap-1 hover:bg-neutral-200 dark:hover:bg-neutral-800 px-2 py-1 rounded transition-colors"
-          aria-expanded={saveDropdownOpen}
-          aria-label="Save options"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            class="size-6"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h1.5m9 0h-9"
-            />
-          </svg>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            class="size-4 transition-transform"
-            class:rotate-180={saveDropdownOpen}
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="m19.5 8.25-7.5 7.5-7.5-7.5"
-            />
-          </svg>
-        </button>
-
-        <!-- Dropdown menu -->
-        {#if saveDropdownOpen}
-          <div
-            bind:this={saveDropdownRef}
-            class="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-800 rounded-md shadow-lg py-1 z-50 border border-neutral-200 dark:border-neutral-700"
-            role="menu"
-          >
-            <!-- Save option -->
-            <button
-              on:click={() => {
-                saveProject();
-                saveDropdownOpen = false;
-              }}
-              class="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-              role="menuitem"
-              title="Save to current file"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="2"
-                stroke="currentColor"
-                class="size-4"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0 1 20.25 6v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h1.5m9 0h-9"
-                />
-              </svg>
-              <div class="flex flex-col">
-                <span class="font-medium">Save</span>
-                <span class="text-xs text-neutral-500 dark:text-neutral-400">
-                  {#if $currentFilePath}
-                    Overwrite the current project file in app storage ({$currentFilePath.split(/[\/]/).pop()})
-                  {:else}
-                    No project file selected — this will download the path as a new file to your computer
-                  {/if}
-                </span>
-              </div>
-            </button>
-
-            <!-- Save As option -->
-            <button
-              on:click={() => {
-                saveFileAs();
-                saveDropdownOpen = false;
-              }}
-              class="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-              role="menuitem"
-              title="Save as new file"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke-width="2"
-                stroke="currentColor"
-                class="size-4"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M17 16v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h2m3-4H9a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1m-1 4l-3 3m0 0l-3-3m3 3V3"
-                />
-              </svg>
-              <div class="flex flex-col">
-                <span class="font-medium">Save As</span>
-                <span class="text-xs text-neutral-500 dark:text-neutral-400">
-                  Create a new project file (choose a filename) or download a new .pp to your computer
-                </span>
-              </div>
-            </button>
-          </div>
-        {/if}
-      </div>
-
-      <div class="relative">
-        <button
-          title="Export path"
-          on:click={() => (exportMenuOpen = !exportMenuOpen)}
-          class="flex items-center gap-1"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            class="size-6"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5"
-            />
-          </svg>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            class="size-4"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="m19.5 8.25-7.5 7.5-7.5-7.5"
-            />
-          </svg>
-        </button>
-
-        {#if exportMenuOpen}
-          <div
-            class="absolute right-0 mt-2 w-48 bg-white dark:bg-neutral-800 rounded-md shadow-lg py-1 z-50 border border-neutral-200 dark:border-neutral-700"
-          >
-            <button
-              on:click={() => handleExport("java")}
-              class="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-            >
-              Java Code
-            </button>
-            <button
-              on:click={() => handleExport("points")}
-              class="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-            >
-              Points Array
-            </button>
-            {#if showSequentialExport}
-              <button
-                on:click={() => handleExport("sequential")}
-                class="block w-full text-left px-4 py-2 text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700"
-              >
-                Sequential Command
-              </button>
-            {/if}
-            <!-- GIF export removed temporarily -->
-          </div>
-        {/if}
-      </div>
-    </div>
-
     <div
       class="h-6 border-l border-neutral-300 dark:border-neutral-700 mx-4"
       aria-hidden="true"
@@ -817,16 +495,3 @@
   </div>
 </div>
 
-<style>
-  @keyframes rainbow-glow {
-    0% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
-    }
-    100% {
-      background-position: 0% 50%;
-    }
-  }
-</style>

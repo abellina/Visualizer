@@ -54,6 +54,7 @@
     getDefaultLines,
     getDefaultShapes,
     RED_ALLIANCE_RED_GOAL,
+    BLUE_ALLIANCE_BLUE_GOAL,
   } from "./config";
   import { loadSettings, saveSettings } from "./utils/settingsPersistence";
   import * as browserFileStore from "./utils/browserFileStore";
@@ -99,6 +100,8 @@
   let manualHeading: number | null = null;
   /** When true, θ_b triangle and bot-to-goal line use turret center instead of bot center. Toggle with key "t". */
   let useTurretCenterForThetaB = false;
+  /** When true, use red alliance red goal; when false, use blue alliance blue goal. */
+  let useRedGoal = true;
   /** Turret angle in bot frame: 0–190°, center (forward) = 95°. q/e rotate, w recenter. */
   const TURRET_ANGLE_MIN = 0;
   const TURRET_ANGLE_MAX = 190;
@@ -697,9 +700,8 @@
     return onionLayers;
   })();
 
-  // Red goal position from FTC-relative coordinates (0,0 at field center): X=-58.3727", Y=55.6425".
-  // Vector ends at this point.
-  $: redGoalCenter = RED_ALLIANCE_RED_GOAL;
+  // Goal position: red or blue alliance goal (toggle in UI).
+  $: goalCenter = useRedGoal ? RED_ALLIANCE_RED_GOAL : BLUE_ALLIANCE_BLUE_GOAL;
 
   // Turret center in pixels (same offset as when θ_b uses turret: 25% robot height toward robot's left).
   $: turretCenterPx = (() => {
@@ -715,14 +717,38 @@
   $: thetaBOriginPx = useTurretCenterForThetaB ? turretCenterPx : robotXY;
 
   $: botToGoalElements = (() => {
-    const gx = x(redGoalCenter.x);
-    const gy = y(redGoalCenter.y);
+    const gx = x(goalCenter.x);
+    const gy = y(goalCenter.y);
     const xb = x.invert(thetaBOriginPx.x);
     const yb = y.invert(thetaBOriginPx.y);
-    const xg = redGoalCenter.x;
-    const yg = redGoalCenter.y;
+    const xg = goalCenter.x;
+    const yg = goalCenter.y;
     const theta_b_rad = Math.atan2(yg - yb, xg - xb);
     const theta_b_deg = (theta_b_rad * 180) / Math.PI;
+
+    // θ_b color: red for red goal, blue for blue goal
+    const goalStroke = useRedGoal ? "#dc2626" : "#2563eb";
+    const goalStrokeDark = useRedGoal ? "#b91c1c" : "#1d4ed8";
+
+    // θ_b arc: from field +X (0) to origin→goal direction, so the computed angle is visible
+    const thetaBArcRadiusPx = x(3);
+    const thetaBArcEndAngle = Math.atan2(
+      gy - thetaBOriginPx.y,
+      gx - thetaBOriginPx.x,
+    );
+    const thetaBArc = new Two.ArcSegment(
+      thetaBOriginPx.x,
+      thetaBOriginPx.y,
+      0,
+      thetaBArcRadiusPx,
+      0,
+      thetaBArcEndAngle,
+      32,
+    );
+    thetaBArc.noFill();
+    thetaBArc.stroke = goalStroke;
+    thetaBArc.linewidth = Math.max(4, x(0.5));
+    thetaBArc.opacity = 0.9;
 
     // Heading: 12-inch arrow from robot center only (unchanged by turret toggle)
     const xb_robot = x.invert(robotXY.x);
@@ -779,16 +805,17 @@
     );
     headingArc.noFill();
     headingArc.stroke = "#16a34a";
-    headingArc.linewidth = Math.max(2.5, x(0.25));
+    headingArc.linewidth = Math.max(4, x(0.5));
 
     const theta_h_deg = -robotHeading;
     const arcMidAngle = (arcStartAngle + arcEndAngle) / 2;
     const labelRadius = arcRadiusPx * 1.4;
-    const headingLabelX = robotXY.x + Math.cos(arcMidAngle) * labelRadius;
+    const headingLabelOffsetRight = x(4.5);
+    const headingLabelX = robotXY.x + Math.cos(arcMidAngle) * labelRadius + headingLabelOffsetRight;
     const headingLabelY = robotXY.y - Math.sin(arcMidAngle) * labelRadius;
     const angleFontSize = Math.max(18, x(3));
     const headingLabel = new Two.Text(
-      `θ_h = ${theta_h_deg.toFixed(1)}°`,
+      `θₕ = ${theta_h_deg.toFixed(1)}°`,
       headingLabelX,
       headingLabelY,
       { size: angleFontSize, leading: angleFontSize },
@@ -859,7 +886,7 @@
     const turretLabelY = turretCenterPx.y - Math.sin(turretArcMid) * turretLabelRadius;
     const turretFontSize = Math.max(14, x(2.2));
     const turretLabel = new Two.Text(
-      `θ_t = ${theta_t_deg.toFixed(1)}°`,
+      `θₜ = ${theta_t_deg.toFixed(1)}°`,
       turretLabelX,
       turretLabelY,
       { size: turretFontSize, leading: turretFontSize },
@@ -871,31 +898,16 @@
     turretLabel.baseline = "middle";
     turretLabel.style = "user-select: none;";
 
-    // Right triangle for θ_b: vertices at origin (bot or turret), (x_g,y_b), goal (x_g,y_g). Right angle at (x_g,y_b).
-    const thetaTriangle = new Two.Path(
-      [
-        new Two.Anchor(thetaBOriginPx.x, thetaBOriginPx.y, 0, 0, 0, 0, Two.Commands.move),
-        new Two.Anchor(gx, thetaBOriginPx.y, 0, 0, 0, 0, Two.Commands.line),
-        new Two.Anchor(gx, gy, 0, 0, 0, 0, Two.Commands.line),
-        new Two.Anchor(thetaBOriginPx.x, thetaBOriginPx.y, 0, 0, 0, 0, Two.Commands.close),
-      ],
-      true,
-    );
-    thetaTriangle.fill = "rgba(220, 38, 38, 0.15)";
-    thetaTriangle.stroke = "#dc2626";
-    thetaTriangle.linewidth = 1;
-    thetaTriangle.opacity = 1;
-
-    // Label θ_b at the origin vertex (angle corner)
+    // Label θ_b along the arrow (origin → goal)
     const labelX = thetaBOriginPx.x + (gx - thetaBOriginPx.x) * 0.28;
     const labelY = thetaBOriginPx.y + (gy - thetaBOriginPx.y) * 0.12;
     const thetaLabel = new Two.Text(
-      `θ_b = ${theta_b_deg.toFixed(1)}°`,
+      `θᵦ = ${theta_b_deg.toFixed(1)}°`,
       labelX,
       labelY,
       { size: angleFontSize, leading: angleFontSize },
     );
-    thetaLabel.fill = "#b91c1c";
+    thetaLabel.fill = goalStrokeDark;
     thetaLabel.family = "ui-sans-serif, system-ui, sans-serif";
     thetaLabel.weight = "700";
     thetaLabel.alignment = "center";
@@ -903,7 +915,7 @@
     thetaLabel.style = "user-select: none;";
 
     const line = new Two.Line(thetaBOriginPx.x, thetaBOriginPx.y, gx, gy);
-    line.stroke = "#dc2626";
+    line.stroke = goalStroke;
     line.linewidth = Math.max(1.5, x(0.2));
     line.noFill();
 
@@ -931,18 +943,18 @@
       ],
       true,
     );
-    arrowHead.fill = "#dc2626";
-    arrowHead.stroke = "#b91c1c";
+    arrowHead.fill = goalStroke;
+    arrowHead.stroke = goalStrokeDark;
     arrowHead.linewidth = 1;
     arrowHead.opacity = 0.9;
     // Draw heading triangle and label on top so they aren’t covered by the red θ_b triangle
-    // Z-order: red line and goal arrow first, then red triangle / green θ_h / white θ_t on top
+    // Z-order: red θ_b arrow + arc + label, then green θ_h / white θ_t on top
     return {
       elements: [
         line,
         arrowHead,
+        thetaBArc,
         thetaLabel,
-        thetaTriangle,
         headingArc,
         headingArrowLine,
         headingArrowHead,
@@ -2000,18 +2012,13 @@
   bind:settings
   bind:robotWidth
   bind:robotHeight
+  bind:useRedGoal
   {percent}
-  {saveProject}
-  {saveFileAs}
-  {loadFile}
-  {loadRobot}
   {undoAction}
   {redoAction}
   {recordChange}
   {canUndo}
   {canRedo}
-  {optimizeAllLines}
-  {optimizingAll}
 />
 <!--   {saveFile} -->
 <div
@@ -2106,6 +2113,14 @@
           style="position: absolute; left: 50%; top: 25%; width: {Math.max(20, x(5))}px; height: {Math.max(20, x(5))}px; transform: translate(-50%, -50%); border-radius: 50%; background: #ea580c; border: 3px solid #c2410c; box-sizing: border-box; z-index: 1;"
           aria-hidden="true"
         />
+        <!-- INTAKE at 90° (right edge). Full-width bar; rotates with bot (no counter-rotate). -->
+        <div
+          class="intake-label"
+          style="position: absolute; right: -50%; top: 42%; width: 100%; height: fit-content; display: flex; align-items: center; justify-content: center; z-index: 2; padding: 2px 4px; background: #1e40af; color: white; font-size: {Math.max(10, x(1.2))}px; font-weight: 700; font-family: ui-sans-serif, system-ui, sans-serif; white-space: nowrap; border-radius: 2px; border: 1px solid #1e3a8a; box-sizing: border-box; transform: rotate(90deg)"
+          aria-hidden="true"
+        >
+          INTAKE
+        </div>
       </div>
     </div>
   </div>
@@ -2123,7 +2138,8 @@
     bind:robotXY
     bind:robotHeading
     bind:shapes
-    redGoalCenter={redGoalCenter}
+    goalCenter={goalCenter}
+    bind:useRedGoal
     {thetaBOriginPx}
     {turretAngle}
     {x}
