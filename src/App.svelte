@@ -95,9 +95,12 @@
   let robotHeading: number = 0;
   // Manual bot position (field inches). When set, arrow keys have moved the bot; Escape clears.
   let manualBotPosition: { x: number; y: number } | null = null;
+  /** When set, overrides animation heading (e.g. after a/d/s rotation). Cleared with Escape. */
+  let manualHeading: number | null = null;
   let animationRobotXY: BasePoint = { x: 0, y: 0 };
   let animationRobotHeading: number = 0;
   const ARROW_KEY_STEP_INCHES = 2;
+  const ROTATION_STEP_DEGREES = 1;
 
   function clampToField(pos: { x: number; y: number }) {
     return {
@@ -228,14 +231,15 @@
     }
   }
   $: {
-    // Use manual position if set (clamped to field), otherwise animation position
+    // Use manual position/heading if set (clamped to field), otherwise animation
     if (manualBotPosition != null) {
       const clamped = clampToField(manualBotPosition);
       robotXY = { x: x(clamped.x), y: y(clamped.y) };
-      robotHeading = animationRobotHeading;
+      robotHeading = manualHeading != null ? manualHeading : animationRobotHeading;
     } else {
       robotXY = animationRobotXY;
       robotHeading = animationRobotHeading;
+      manualHeading = null;
     }
   }
 
@@ -690,7 +694,7 @@
   // Vector ends at this point.
   $: redGoalCenter = RED_ALLIANCE_RED_GOAL;
 
-  // Bot-to-goal visualization: θ_b triangle, line from bot to goal, and arrowhead
+  // Bot-to-goal visualization: heading triangle, θ_b triangle, line from bot to goal, and arrowhead
   $: botToGoalElements = (() => {
     const gx = x(redGoalCenter.x);
     const gy = y(redGoalCenter.y);
@@ -700,6 +704,80 @@
     const yg = redGoalCenter.y;
     const theta_b_rad = Math.atan2(yg - yb, xg - xb);
     const theta_b_deg = (theta_b_rad * 180) / Math.PI;
+
+    // Heading: 12-inch arrow in heading direction + arc from horizontal to heading
+    const HEADING_ARROW_INCHES = 12;
+    const heading_rad = (-robotHeading * Math.PI) / 180;
+    const ch = Math.cos(heading_rad);
+    const sh = Math.sin(heading_rad);
+    const tipX_field = xb + HEADING_ARROW_INCHES * ch;
+    const tipY_field = yb + HEADING_ARROW_INCHES * sh;
+    const tipPx = x(tipX_field);
+    const tipPy = y(tipY_field);
+
+    const headingArrowLine = new Two.Line(robotXY.x, robotXY.y, tipPx, tipPy);
+    headingArrowLine.stroke = "#16a34a";
+    headingArrowLine.linewidth = Math.max(2, x(0.2));
+    headingArrowLine.noFill();
+
+    const arrDx = tipPx - robotXY.x;
+    const arrDy = tipPy - robotXY.y;
+    const arrLen = Math.sqrt(arrDx * arrDx + arrDy * arrDy) || 1;
+    const arrUx = arrDx / arrLen;
+    const arrUy = arrDy / arrLen;
+    const arrHeadLen = Math.max(10, x(1));
+    const arrHeadW = Math.max(5, x(0.5));
+    const headBack1X = tipPx - arrUx * arrHeadLen + arrUy * arrHeadW;
+    const headBack1Y = tipPy - arrUy * arrHeadLen - arrUx * arrHeadW;
+    const headBack2X = tipPx - arrUx * arrHeadLen - arrUy * arrHeadW;
+    const headBack2Y = tipPy - arrUy * arrHeadLen + arrUx * arrHeadW;
+    const headingArrowHead = new Two.Path(
+      [
+        new Two.Anchor(tipPx, tipPy, 0, 0, 0, 0, Two.Commands.move),
+        new Two.Anchor(headBack1X, headBack1Y, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(headBack2X, headBack2Y, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(tipPx, tipPy, 0, 0, 0, 0, Two.Commands.close),
+      ],
+      true,
+    );
+    headingArrowHead.fill = "#16a34a";
+    headingArrowHead.stroke = "#15803d";
+    headingArrowHead.linewidth = 1;
+
+    const arcRadiusPx = x(4);
+    const arcStartAngle = 0;
+    const arcEndAngle = Math.atan2(-sh, ch);
+    const headingArc = new Two.ArcSegment(
+      robotXY.x,
+      robotXY.y,
+      0,
+      arcRadiusPx,
+      arcStartAngle,
+      arcEndAngle,
+      32,
+    );
+    headingArc.noFill();
+    headingArc.stroke = "#16a34a";
+    headingArc.linewidth = Math.max(2.5, x(0.25));
+
+    const heading_deg = -robotHeading;
+    const arcMidAngle = (arcStartAngle + arcEndAngle) / 2;
+    const labelRadius = arcRadiusPx * 1.4;
+    const headingLabelX = robotXY.x + Math.cos(arcMidAngle) * labelRadius;
+    const headingLabelY = robotXY.y - Math.sin(arcMidAngle) * labelRadius;
+    const angleFontSize = Math.max(18, x(3));
+    const headingLabel = new Two.Text(
+      `heading = ${heading_deg.toFixed(1)}°`,
+      headingLabelX,
+      headingLabelY,
+      { size: angleFontSize, leading: angleFontSize },
+    );
+    headingLabel.fill = "#15803d";
+    headingLabel.family = "ui-sans-serif, system-ui, sans-serif";
+    headingLabel.weight = "700";
+    headingLabel.alignment = "center";
+    headingLabel.baseline = "middle";
+    headingLabel.style = "user-select: none;";
 
     // Right triangle for θ_b: vertices at bot (x_b,y_b), (x_g,y_b), goal (x_g,y_g). Right angle at (x_g,y_b).
     const thetaTriangle = new Two.Path(
@@ -716,18 +794,18 @@
     thetaTriangle.linewidth = 1;
     thetaTriangle.opacity = 1;
 
-    // Label θ_b at the bot vertex (angle corner), offset slightly inside the triangle
+    // Label θ_b at the bot vertex (angle corner), larger font
     const labelX = robotXY.x + (gx - robotXY.x) * 0.28;
     const labelY = robotXY.y + (gy - robotXY.y) * 0.12;
     const thetaLabel = new Two.Text(
       `θ_b = ${theta_b_deg.toFixed(1)}°`,
       labelX,
       labelY,
-      Math.max(10, x(1.2)),
+      { size: angleFontSize, leading: angleFontSize },
     );
     thetaLabel.fill = "#b91c1c";
     thetaLabel.family = "ui-sans-serif, system-ui, sans-serif";
-    thetaLabel.weight = "600";
+    thetaLabel.weight = "700";
     thetaLabel.alignment = "center";
     thetaLabel.baseline = "middle";
     thetaLabel.style = "user-select: none;";
@@ -765,7 +843,19 @@
     arrowHead.stroke = "#b91c1c";
     arrowHead.linewidth = 1;
     arrowHead.opacity = 0.9;
-    return [thetaTriangle, line, arrowHead, thetaLabel];
+    // Draw heading triangle and label on top so they aren’t covered by the red θ_b triangle
+    return {
+      elements: [
+        thetaTriangle,
+        line,
+        arrowHead,
+        thetaLabel,
+        headingArc,
+        headingArrowLine,
+        headingArrowHead,
+        headingLabel,
+      ],
+    };
   })();
 
   let isLoaded = false;
@@ -895,7 +985,7 @@
     }
     two.add(...path);
     two.add(...points);
-    two.add(...botToGoalElements);
+    two.add(...botToGoalElements.elements);
 
     two.update();
   })();
@@ -1638,15 +1728,38 @@
     event.preventDefault();
     addNewLine();
   });
-  hotkeys("a", function (event, handler) {
+  hotkeys("shift+a", function (event, handler) {
     event.preventDefault();
     addControlPoint();
     two.update();
   });
-  hotkeys("s", function (event, handler) {
+  hotkeys("shift+s", function (event, handler) {
     event.preventDefault();
     removeControlPoint();
     two.update();
+  });
+  // a/d/s: rotate bot (a = left, d = right, s = reset heading to 90°)
+  function ensureManualThenRotate(updateHeading: (current: number) => number) {
+    if (manualBotPosition == null) {
+      manualBotPosition = clampToField({
+        x: x.invert(animationRobotXY.x),
+        y: y.invert(animationRobotXY.y),
+      });
+    }
+    const current = manualHeading != null ? manualHeading : animationRobotHeading;
+    manualHeading = updateHeading(current);
+  }
+  hotkeys("a", function (event) {
+    event.preventDefault();
+    ensureManualThenRotate((h) => h - ROTATION_STEP_DEGREES);
+  });
+  hotkeys("d", function (event) {
+    event.preventDefault();
+    ensureManualThenRotate((h) => h + ROTATION_STEP_DEGREES);
+  });
+  hotkeys("s", function (event) {
+    event.preventDefault();
+    ensureManualThenRotate(() => -90);
   });
   hotkeys("cmd+z, ctrl+z", function (event) {
     event.preventDefault();
@@ -1697,8 +1810,9 @@
     }));
   });
   hotkeys("escape", function (event) {
-    if (manualBotPosition != null) {
+    if (manualBotPosition != null || manualHeading != null) {
       manualBotPosition = null;
+      manualHeading = null;
       event.preventDefault();
     }
   });
