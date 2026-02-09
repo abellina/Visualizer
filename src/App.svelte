@@ -906,21 +906,33 @@
     turretLabel.baseline = "middle";
     turretLabel.style = "user-select: none;";
 
-    // Label θ_b along the arrow (origin → goal)
+    // Label θ_b along the arrow (origin → goal); b as subscript
     const labelX = thetaBOriginPx.x + (gx - thetaBOriginPx.x) * 0.28;
     const labelY = thetaBOriginPx.y + (gy - thetaBOriginPx.y) * 0.12;
-    const thetaLabel = new Two.Text(
-      `θᵦ = ${theta_b_deg.toFixed(1)}°`,
-      labelX,
-      labelY,
-      { size: angleFontSize, leading: angleFontSize },
-    );
-    thetaLabel.fill = goalStrokeDark;
-    thetaLabel.family = "ui-sans-serif, system-ui, sans-serif";
-    thetaLabel.weight = "700";
-    thetaLabel.alignment = "center";
-    thetaLabel.baseline = "middle";
-    thetaLabel.style = "user-select: none;";
+    const thetaLabelGroup = new Two.Group();
+    thetaLabelGroup.position.set(labelX, labelY);
+    const thetaSym = new Two.Text("θ", 0, 0, { size: angleFontSize, leading: angleFontSize });
+    thetaSym.fill = goalStrokeDark;
+    thetaSym.family = "ui-sans-serif, system-ui, sans-serif";
+    thetaSym.weight = "700";
+    thetaSym.alignment = "left";
+    thetaSym.baseline = "middle";
+    thetaSym.style = "user-select: none;";
+    const subB = new Two.Text("b", angleFontSize * 0.55, angleFontSize * 0.2, { size: angleFontSize * 0.65, leading: angleFontSize * 0.65 });
+    subB.fill = goalStrokeDark;
+    subB.family = "ui-sans-serif, system-ui, sans-serif";
+    subB.weight = "700";
+    subB.alignment = "left";
+    subB.baseline = "middle";
+    subB.style = "user-select: none;";
+    const thetaValue = new Two.Text(` = ${theta_b_deg.toFixed(1)}°`, angleFontSize * 0.9, 0, { size: angleFontSize, leading: angleFontSize });
+    thetaValue.fill = goalStrokeDark;
+    thetaValue.family = "ui-sans-serif, system-ui, sans-serif";
+    thetaValue.weight = "700";
+    thetaValue.alignment = "left";
+    thetaValue.baseline = "middle";
+    thetaValue.style = "user-select: none;";
+    thetaLabelGroup.add(thetaSym, subB, thetaValue);
 
     const line = new Two.Line(thetaBOriginPx.x, thetaBOriginPx.y, gx, gy);
     line.stroke = goalStroke;
@@ -962,7 +974,7 @@
         line,
         arrowHead,
         thetaBArc,
-        thetaLabel,
+        thetaLabelGroup,
         headingArc,
         headingArrowLine,
         headingArrowHead,
