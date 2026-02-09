@@ -15,6 +15,39 @@ export const LINE_WIDTH = 0.57;
 export const FIELD_SIZE = 144;
 
 /**
+ * FTC field: origin (0,0) at center. Field size 144" so center = 72.
+ */
+export const FIELD_CENTER = FIELD_SIZE / 2;
+
+/**
+ * Red goal in FTC-relative coordinates (origin at center of field).
+ * X = 58.3727 in, Y = 55.6425 in.
+ */
+export const RED_GOAL_FTC_CENTER = { x: 58.3727, y: 55.6425 };
+
+/**
+ * Blue goal in FTC-relative coordinates (origin at center of field).
+ * X = -58.3727 in, Y = 55.6425 in.
+ */
+export const BLUE_GOAL_FTC_CENTER = { x: -58.3727, y: 55.6425 };
+
+/**
+ * Red goal in visualizer field coordinates (0–144 inches, corner origin).
+ */
+export const RED_ALLIANCE_RED_GOAL = {
+  x: FIELD_CENTER + RED_GOAL_FTC_CENTER.x,
+  y: FIELD_CENTER + RED_GOAL_FTC_CENTER.y,
+};
+
+/**
+ * Blue goal in visualizer field coordinates (0–144 inches, corner origin).
+ */
+export const BLUE_ALLIANCE_BLUE_GOAL = {
+  x: FIELD_CENTER + BLUE_GOAL_FTC_CENTER.x,
+  y: FIELD_CENTER + BLUE_GOAL_FTC_CENTER.y,
+};
+
+/**
  * Available field maps
  */
 export const AVAILABLE_FIELD_MAPS = [

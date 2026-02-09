@@ -11,6 +11,7 @@
   import { getRandomColor } from "../utils";
   import ObstaclesSection from "./components/ObstaclesSection.svelte";
   import RobotPositionDisplay from "./components/RobotPositionDisplay.svelte";
+  import BotToGoalSection from "./components/BotToGoalSection.svelte";
   import StartingPointSection from "./components/StartingPointSection.svelte";
   import PathLineSection from "./components/PathLineSection.svelte";
   import PlaybackControls from "./components/PlaybackControls.svelte";
@@ -37,6 +38,7 @@
   export let optimizingLineIds: Record<string, boolean> = {};
 
   export let shapes: Shape[];
+  export let redGoalCenter: { x: number; y: number };
   export let recordChange: () => void;
 
   // Reference exported but unused props to silence Svelte unused-export warnings
@@ -521,6 +523,14 @@
     <ObstaclesSection bind:shapes bind:collapsedObstacles />
 
     <RobotPositionDisplay {robotXY} {robotHeading} {x} {y} />
+
+    <BotToGoalSection
+      {robotXY}
+      {x}
+      {y}
+      goal={redGoalCenter}
+      goalLabel="Red Alliance Red Goal"
+    />
 
     <StartingPointSection bind:startPoint {addPathAtStart} {addWaitAtStart} />
 

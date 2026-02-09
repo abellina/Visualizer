@@ -53,6 +53,7 @@
     getDefaultStartPoint,
     getDefaultLines,
     getDefaultShapes,
+    RED_ALLIANCE_RED_GOAL,
   } from "./config";
   import { loadSettings, saveSettings } from "./utils/settingsPersistence";
   import * as browserFileStore from "./utils/browserFileStore";
@@ -663,6 +664,50 @@
     return onionLayers;
   })();
 
+  // Red goal position from FTC-relative coordinates (0,0 at field center): X=-58.3727", Y=55.6425".
+  // Vector ends at this point.
+  $: redGoalCenter = RED_ALLIANCE_RED_GOAL;
+
+  // Bot-to-goal visualization: line from robot center to red goal + arrowhead triangle
+  $: botToGoalElements = (() => {
+    const gx = x(redGoalCenter.x);
+    const gy = y(redGoalCenter.y);
+    const line = new Two.Line(robotXY.x, robotXY.y, gx, gy);
+    line.stroke = "#dc2626";
+    line.linewidth = Math.max(1.5, x(0.2));
+    line.noFill();
+
+    const dx = robotXY.x - gx;
+    const dy = robotXY.y - gy;
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const perpX = -uy;
+    const perpY = ux;
+    const arrowLen = Math.max(12, x(1.2));
+    const arrowWidth = Math.max(6, x(0.6));
+    const tipX = gx;
+    const tipY = gy;
+    const back1X = gx + ux * arrowLen + perpX * arrowWidth;
+    const back1Y = gy + uy * arrowLen + perpY * arrowWidth;
+    const back2X = gx + ux * arrowLen - perpX * arrowWidth;
+    const back2Y = gy + uy * arrowLen - perpY * arrowWidth;
+    const triangle = new Two.Path(
+      [
+        new Two.Anchor(tipX, tipY, 0, 0, 0, 0, Two.Commands.move),
+        new Two.Anchor(back1X, back1Y, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(back2X, back2Y, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(tipX, tipY, 0, 0, 0, 0, Two.Commands.close),
+      ],
+      true,
+    );
+    triangle.fill = "#dc2626";
+    triangle.stroke = "#b91c1c";
+    triangle.linewidth = 1;
+    triangle.opacity = 0.9;
+    return [line, triangle];
+  })();
+
   let isLoaded = false;
   // Reactively trigger when any saveable data changes
   $: {
@@ -790,6 +835,7 @@
     }
     two.add(...path);
     two.add(...points);
+    two.add(...botToGoalElements);
 
     two.update();
   })();
@@ -1725,6 +1771,7 @@ pointer-events: none;`}
     bind:robotXY
     bind:robotHeading
     bind:shapes
+    redGoalCenter={redGoalCenter}
     {x}
     {y}
     {animationDuration}
