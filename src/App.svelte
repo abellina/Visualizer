@@ -1839,8 +1839,8 @@
     }
   }
 
-  // Keyboard shortcuts for quick path editing
-  hotkeys("w", function (event, handler) {
+  // Keyboard shortcuts for quick path editing (w is reserved for reset turret below)
+  hotkeys("shift+n", function (event, handler) {
     event.preventDefault();
     addNewLine();
   });
@@ -1946,7 +1946,7 @@
   });
   hotkeys("w", function (event) {
     event.preventDefault();
-    turretAngle = TURRET_ANGLE_CENTER;
+    turretAngle = TURRET_ANGLE_CENTER; // reset turret only; bot position/heading unchanged
   });
   function applyTheme(theme: "light" | "dark" | "auto") {
     let actualTheme = theme;

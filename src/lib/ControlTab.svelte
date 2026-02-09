@@ -575,7 +575,7 @@
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">a</kbd> / <kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">d</kbd> Rotate bot left / right (1°)</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">s</kbd> Reset bot heading to 90°</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">q</kbd> / <kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">e</kbd> Rotate turret left / right (1°, 0–190°)</li>
-        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">w</kbd> Turret forward (95°)</li>
+        <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">w</kbd> Reset turret to forward (95°)</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">t</kbd> Use turret center for θ<sub>b</sub> (toggle)</li>
         <li><kbd class="px-1 py-0.5 rounded bg-neutral-200 dark:bg-neutral-600 font-mono">Escape</kbd> Clear manual position</li>
       </ul>
