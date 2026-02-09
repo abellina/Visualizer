@@ -93,6 +93,18 @@
   $: robotHeight = settings?.rHeight || DEFAULT_ROBOT_HEIGHT;
   let robotXY: BasePoint = { x: 0, y: 0 };
   let robotHeading: number = 0;
+  // Manual bot position (field inches). When set, arrow keys have moved the bot; Escape clears.
+  let manualBotPosition: { x: number; y: number } | null = null;
+  let animationRobotXY: BasePoint = { x: 0, y: 0 };
+  let animationRobotHeading: number = 0;
+  const ARROW_KEY_STEP_INCHES = 2;
+
+  function clampToField(pos: { x: number; y: number }) {
+    return {
+      x: Math.max(0, Math.min(FIELD_SIZE, pos.x)),
+      y: Math.max(0, Math.min(FIELD_SIZE, pos.y)),
+    };
+  }
   // Animation state
   let percent: number = 0;
   let playing = false;
@@ -197,7 +209,7 @@
     .domain([0, FIELD_SIZE])
     .range([height || FIELD_SIZE, 0]);
   $: {
-    // Calculate robot state using the Timeline
+    // Calculate robot state using the Timeline (animation-derived position)
     if (timePrediction && timePrediction.timeline && lines.length > 0) {
       const state = calculateRobotState(
         percent,
@@ -208,12 +220,22 @@
         x,
         y,
       );
-      robotXY = { x: state.x, y: state.y };
-      robotHeading = state.heading;
+      animationRobotXY = { x: state.x, y: state.y };
+      animationRobotHeading = state.heading;
     } else {
-      // Fallback for initialization
-      robotXY = { x: x(startPoint.x), y: y(startPoint.y) };
-      robotHeading = 0;
+      animationRobotXY = { x: x(startPoint.x), y: y(startPoint.y) };
+      animationRobotHeading = 0;
+    }
+  }
+  $: {
+    // Use manual position if set (clamped to field), otherwise animation position
+    if (manualBotPosition != null) {
+      const clamped = clampToField(manualBotPosition);
+      robotXY = { x: x(clamped.x), y: y(clamped.y) };
+      robotHeading = animationRobotHeading;
+    } else {
+      robotXY = animationRobotXY;
+      robotHeading = animationRobotHeading;
     }
   }
 
@@ -668,10 +690,48 @@
   // Vector ends at this point.
   $: redGoalCenter = RED_ALLIANCE_RED_GOAL;
 
-  // Bot-to-goal visualization: line from robot center to red goal + arrowhead triangle
+  // Bot-to-goal visualization: θ_b triangle, line from bot to goal, and arrowhead
   $: botToGoalElements = (() => {
     const gx = x(redGoalCenter.x);
     const gy = y(redGoalCenter.y);
+    const xb = x.invert(robotXY.x);
+    const yb = y.invert(robotXY.y);
+    const xg = redGoalCenter.x;
+    const yg = redGoalCenter.y;
+    const theta_b_rad = Math.atan2(yg - yb, xg - xb);
+    const theta_b_deg = (theta_b_rad * 180) / Math.PI;
+
+    // Right triangle for θ_b: vertices at bot (x_b,y_b), (x_g,y_b), goal (x_g,y_g). Right angle at (x_g,y_b).
+    const thetaTriangle = new Two.Path(
+      [
+        new Two.Anchor(robotXY.x, robotXY.y, 0, 0, 0, 0, Two.Commands.move),
+        new Two.Anchor(gx, robotXY.y, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(gx, gy, 0, 0, 0, 0, Two.Commands.line),
+        new Two.Anchor(robotXY.x, robotXY.y, 0, 0, 0, 0, Two.Commands.close),
+      ],
+      true,
+    );
+    thetaTriangle.fill = "rgba(220, 38, 38, 0.15)";
+    thetaTriangle.stroke = "#dc2626";
+    thetaTriangle.linewidth = 1;
+    thetaTriangle.opacity = 1;
+
+    // Label θ_b at the bot vertex (angle corner), offset slightly inside the triangle
+    const labelX = robotXY.x + (gx - robotXY.x) * 0.28;
+    const labelY = robotXY.y + (gy - robotXY.y) * 0.12;
+    const thetaLabel = new Two.Text(
+      `θ_b = ${theta_b_deg.toFixed(1)}°`,
+      labelX,
+      labelY,
+      Math.max(10, x(1.2)),
+    );
+    thetaLabel.fill = "#b91c1c";
+    thetaLabel.family = "ui-sans-serif, system-ui, sans-serif";
+    thetaLabel.weight = "600";
+    thetaLabel.alignment = "center";
+    thetaLabel.baseline = "middle";
+    thetaLabel.style = "user-select: none;";
+
     const line = new Two.Line(robotXY.x, robotXY.y, gx, gy);
     line.stroke = "#dc2626";
     line.linewidth = Math.max(1.5, x(0.2));
@@ -692,7 +752,7 @@
     const back1Y = gy + uy * arrowLen + perpY * arrowWidth;
     const back2X = gx + ux * arrowLen - perpX * arrowWidth;
     const back2Y = gy + uy * arrowLen - perpY * arrowWidth;
-    const triangle = new Two.Path(
+    const arrowHead = new Two.Path(
       [
         new Two.Anchor(tipX, tipY, 0, 0, 0, 0, Two.Commands.move),
         new Two.Anchor(back1X, back1Y, 0, 0, 0, 0, Two.Commands.line),
@@ -701,11 +761,11 @@
       ],
       true,
     );
-    triangle.fill = "#dc2626";
-    triangle.stroke = "#b91c1c";
-    triangle.linewidth = 1;
-    triangle.opacity = 0.9;
-    return [line, triangle];
+    arrowHead.fill = "#dc2626";
+    arrowHead.stroke = "#b91c1c";
+    arrowHead.linewidth = 1;
+    arrowHead.opacity = 0.9;
+    return [thetaTriangle, line, arrowHead, thetaLabel];
   })();
 
   let isLoaded = false;
@@ -1595,6 +1655,52 @@
   hotkeys("cmd+shift+z, ctrl+shift+z, ctrl+y", function (event) {
     event.preventDefault();
     redoAction();
+  });
+
+  // Arrow keys: move bot position (field inches). Escape clears manual control.
+  function ensureManualThenUpdate(
+    update: (pos: { x: number; y: number }) => Partial<{ x: number; y: number }>,
+  ) {
+    if (manualBotPosition == null) {
+      manualBotPosition = clampToField({
+        x: x.invert(animationRobotXY.x),
+        y: y.invert(animationRobotXY.y),
+      });
+    }
+    manualBotPosition = clampToField({
+      ...manualBotPosition,
+      ...update(manualBotPosition),
+    });
+  }
+  hotkeys("left", function (event) {
+    event.preventDefault();
+    ensureManualThenUpdate((p) => ({
+      x: Math.max(0, p.x - ARROW_KEY_STEP_INCHES),
+    }));
+  });
+  hotkeys("right", function (event) {
+    event.preventDefault();
+    ensureManualThenUpdate((p) => ({
+      x: Math.min(FIELD_SIZE, p.x + ARROW_KEY_STEP_INCHES),
+    }));
+  });
+  hotkeys("up", function (event) {
+    event.preventDefault();
+    ensureManualThenUpdate((p) => ({
+      y: Math.min(FIELD_SIZE, p.y + ARROW_KEY_STEP_INCHES),
+    }));
+  });
+  hotkeys("down", function (event) {
+    event.preventDefault();
+    ensureManualThenUpdate((p) => ({
+      y: Math.max(0, p.y - ARROW_KEY_STEP_INCHES),
+    }));
+  });
+  hotkeys("escape", function (event) {
+    if (manualBotPosition != null) {
+      manualBotPosition = null;
+      event.preventDefault();
+    }
   });
   function applyTheme(theme: "light" | "dark" | "auto") {
     let actualTheme = theme;
