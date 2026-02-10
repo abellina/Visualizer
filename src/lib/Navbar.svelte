@@ -31,6 +31,8 @@
   export let recordChange: () => any;
   /** When true, red goal; when false, blue goal. Toggle button in bar. */
   export let useRedGoal: boolean = true;
+  /** When false: snap to tag (θ_b to goal center). When true: snap to goal (θ_b extended 6" in +x). */
+  export let snapToGoal: boolean = false;
 
   let fileManagerOpen = false;
   let settingsOpen = false;
@@ -199,6 +201,17 @@
         : 'bg-blue-500/90 border-blue-600 text-white hover:bg-blue-600'}"
     >
       {useRedGoal ? "Red goal" : "Blue goal"}
+    </button>
+
+    <button
+      type="button"
+      title={snapToGoal ? "Snap to goal (θ_b extended 6\" in +x)" : "Snap to tag (θ_b to goal center)"}
+      on:click={() => (snapToGoal = !snapToGoal)}
+      class="px-3 py-1.5 text-sm font-medium rounded border-2 transition-colors {snapToGoal
+        ? 'bg-amber-500/90 border-amber-600 text-white hover:bg-amber-600'
+        : 'bg-neutral-200 dark:bg-neutral-600 border-neutral-300 dark:border-neutral-500 text-neutral-800 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-500'}"
+    >
+      {snapToGoal ? "Snap to goal" : "Snap to tag"}
     </button>
 
     <!-- Divider -->

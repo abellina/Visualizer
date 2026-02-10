@@ -710,6 +710,14 @@
 
   // Goal position: red or blue alliance goal (toggle in UI).
   $: goalCenter = useRedGoal ? RED_ALLIANCE_RED_GOAL : BLUE_ALLIANCE_BLUE_GOAL;
+  /** When false: snap to tag (θ_b line to goal center). When true: snap to goal (line extended 6" in +x). */
+  let snapToGoal = false;
+  $: thetaBTarget = snapToGoal
+    ? {
+        x: goalCenter.x + (useRedGoal ? 6 : -6),
+        y: goalCenter.y + 6,
+      }
+    : goalCenter;
 
   // Turret center in pixels (same offset as when θ_b uses turret: 25% robot height toward robot's left).
   $: turretCenterPx = (() => {
@@ -725,12 +733,12 @@
   $: thetaBOriginPx = useTurretCenterForThetaB ? turretCenterPx : robotXY;
 
   $: botToGoalElements = (() => {
-    const gx = x(goalCenter.x);
-    const gy = y(goalCenter.y);
+    const gx = x(thetaBTarget.x);
+    const gy = y(thetaBTarget.y);
     const xb = x.invert(thetaBOriginPx.x);
     const yb = y.invert(thetaBOriginPx.y);
-    const xg = goalCenter.x;
-    const yg = goalCenter.y;
+    const xg = thetaBTarget.x;
+    const yg = thetaBTarget.y;
     const theta_b_rad = Math.atan2(yg - yb, xg - xb);
     const theta_b_deg = (theta_b_rad * 180) / Math.PI;
 
@@ -2027,6 +2035,7 @@
   bind:robotWidth
   bind:robotHeight
   bind:useRedGoal
+  bind:snapToGoal
   {percent}
   {recordChange}
 />
@@ -2148,7 +2157,7 @@
     bind:robotXY
     bind:robotHeading
     bind:shapes
-    goalCenter={goalCenter}
+    goalCenter={thetaBTarget}
     bind:useRedGoal
     {thetaBOriginPx}
     {turretCenterPx}
