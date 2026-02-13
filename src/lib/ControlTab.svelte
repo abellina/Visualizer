@@ -60,6 +60,10 @@
     if (d <= -180) d += 360;
     return d;
   }
+  /** Normalize angle to [0, 360) for display (e.g. θ_h). */
+  function angle0to360(deg: number): number {
+    return ((deg % 360) + 360) % 360;
+  }
 
   // Reference exported but unused props to silence Svelte unused-export warnings
 
@@ -132,6 +136,10 @@
   $: desired_turret_at_turret_pos = (robotHeading, desiredTurretFromAngleToGoal(theta_b_from_turret_deg));
   $: turn_to_goal_bot_center = wrapAngleDeg(desired_turret_at_bot_center - turretAngle);
   $: turn_to_goal_turret_pos = wrapAngleDeg(desired_turret_at_turret_pos - turretAngle);
+
+  const TURRET_OFFSET_INCHES = 3;
+  $: turretOffsetInches = TURRET_OFFSET_INCHES;
+  $: theta_h_display_deg = angle0to360(-robotHeading);
 
   // State for collapsed sections (kept for potential future use)
   let collapsedSections = {
@@ -593,7 +601,7 @@
       <div class="font-semibold text-neutral-800 dark:text-neutral-200">Angles</div>
       <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-xs">
         <span class="text-neutral-500 dark:text-neutral-400">θ<sub>h</sub></span>
-        <span>{(-robotHeading).toFixed(1)}°</span>
+        <span>{theta_h_display_deg.toFixed(1)}°</span>
         <span class="text-neutral-500 dark:text-neutral-400">θ<sub>t</sub></span>
         <span>{turretAngle.toFixed(1)}°</span>
         <span class="text-neutral-500 dark:text-neutral-400">θ<sub>b</sub></span>
@@ -626,17 +634,20 @@
             Angle from bot to goal (field): θ<sub>b,bot</sub> = atan2(y<sub>g</sub> − y<sub>b</sub>, x<sub>g</sub> − x<sub>b</sub>) = <span class="font-mono">{theta_b_from_bot_deg.toFixed(2)}°</span>
           </div>
           <div class="text-neutral-600 dark:text-neutral-400">
-            θ<sub>b,bot</sub> − θ<sub>h</sub> = {theta_b_from_bot_deg.toFixed(2)} − ({(-robotHeading).toFixed(1)}) = <span class="font-mono">{(theta_b_from_bot_deg - (-robotHeading)).toFixed(1)}°</span>. Desired θ<sub>t</sub> = 95 − (that) → <span class="font-mono font-semibold">{desired_turret_at_bot_center.toFixed(1)}°</span>. Turn by: <span class="font-mono">{turn_to_goal_bot_center >= 0 ? "+" : ""}{turn_to_goal_bot_center.toFixed(1)}°</span>
+            θ<sub>b,bot</sub> − θ<sub>h</sub> = {theta_b_from_bot_deg.toFixed(2)} − ({theta_h_display_deg.toFixed(1)}) = <span class="font-mono">{(theta_b_from_bot_deg - (-robotHeading)).toFixed(1)}°</span>. Desired θ<sub>t</sub> = 95 − (that) → <span class="font-mono font-semibold">{desired_turret_at_bot_center.toFixed(1)}°</span>. Turn by: <span class="font-mono">{turn_to_goal_bot_center >= 0 ? "+" : ""}{turn_to_goal_bot_center.toFixed(1)}°</span>
           </div>
         </div>
 
         <div class="rounded border border-neutral-200 dark:border-neutral-600 p-2 space-y-1">
           <div class="font-medium text-neutral-700 dark:text-neutral-300">2) Use actual turret position</div>
-          <div class="text-neutral-600 dark:text-neutral-400">
-            Angle from turret to goal (field): θ<sub>b,turret</sub> = atan2(y<sub>g</sub> − y<sub>t</sub>, x<sub>g</sub> − x<sub>t</sub>) = <span class="font-mono">{theta_b_from_turret_deg.toFixed(2)}°</span>
+          <div class="text-neutral-600 dark:text-neutral-400 text-xs">
+            Turret is d in left of bot center (θ = −θ<sub>h</sub> = forward in field, left = θ+90°):
+            <div class="font-mono mt-0.5">x<sub>t</sub> = x<sub>b</sub> + d·cos(θ+90°) = {x.invert(robotXY.x).toFixed(3)} + {turretOffsetInches.toFixed(2)}·cos({angle0to360(theta_h_display_deg + 90).toFixed(1)}°) = <span class="font-semibold">{x.invert(turretCenterPx.x).toFixed(3)}</span> in</div>
+            <div class="font-mono">y<sub>t</sub> = y<sub>b</sub> + d·sin(θ+90°) = {y.invert(robotXY.y).toFixed(3)} + {turretOffsetInches.toFixed(2)}·sin({angle0to360(theta_h_display_deg + 90).toFixed(1)}°) = <span class="font-semibold">{y.invert(turretCenterPx.y).toFixed(3)}</span> in</div>
+            Then angle from turret to goal: θ<sub>b,turret</sub> = atan2(y<sub>g</sub> − y<sub>t</sub>, x<sub>g</sub> − x<sub>t</sub>) = <span class="font-mono">{theta_b_from_turret_deg.toFixed(2)}°</span>
           </div>
           <div class="text-neutral-600 dark:text-neutral-400">
-            θ<sub>b,turret</sub> − θ<sub>h</sub> = {theta_b_from_turret_deg.toFixed(2)} − ({(-robotHeading).toFixed(1)}) = <span class="font-mono">{(theta_b_from_turret_deg - (-robotHeading)).toFixed(1)}°</span>. Desired θ<sub>t</sub> = 95 − (that) → <span class="font-mono font-semibold">{desired_turret_at_turret_pos.toFixed(1)}°</span>. Turn by: <span class="font-mono">{turn_to_goal_turret_pos >= 0 ? "+" : ""}{turn_to_goal_turret_pos.toFixed(1)}°</span>
+            θ<sub>b,turret</sub> − θ<sub>h</sub> = {theta_b_from_turret_deg.toFixed(2)} − ({theta_h_display_deg.toFixed(1)}) = <span class="font-mono">{(theta_b_from_turret_deg - (-robotHeading)).toFixed(1)}°</span>. Desired θ<sub>t</sub> = 95 − (that) → <span class="font-mono font-semibold">{desired_turret_at_turret_pos.toFixed(1)}°</span>. Turn by: <span class="font-mono">{turn_to_goal_turret_pos >= 0 ? "+" : ""}{turn_to_goal_turret_pos.toFixed(1)}°</span>
           </div>
         </div>
       </div>

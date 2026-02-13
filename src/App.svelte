@@ -719,14 +719,18 @@
       }
     : goalCenter;
 
-  // Turret center in pixels (same offset as when θ_b uses turret: 25% robot height toward robot's left).
+  // Turret position: d inches left of bot center. Left in field = θ + 90° with θ = −robotHeading (forward).
+  // x_turret = x_b + d·cos(θ+90°), y_turret = y_b + d·sin(θ+90°). d = 3 in.
+  const TURRET_OFFSET_INCHES = 3;
   $: turretCenterPx = (() => {
-    const rad = (robotHeading * Math.PI) / 180;
-    const offsetPx = x(robotHeight) / 4;
-    return {
-      x: robotXY.x + offsetPx * Math.sin(rad),
-      y: robotXY.y - offsetPx * Math.cos(rad),
-    };
+    const xb = x.invert(robotXY.x);
+    const yb = y.invert(robotXY.y);
+    const thetaDeg = -robotHeading; // forward in field
+    const leftRad = ((thetaDeg + 90) * Math.PI) / 180;
+    const d = TURRET_OFFSET_INCHES;
+    const xTurret = xb + d * Math.cos(leftRad);
+    const yTurret = yb + d * Math.sin(leftRad);
+    return { x: x(xTurret), y: y(yTurret) };
   })();
 
   // Origin for θ_b (bot or turret). Turret offset: 25% of robot height toward robot's left.
@@ -824,6 +828,7 @@
     headingArc.linewidth = Math.max(4, x(0.5));
 
     const theta_h_deg = -robotHeading;
+    const theta_h_display = ((theta_h_deg % 360) + 360) % 360;
     const arcMidAngle = (arcStartAngle + arcEndAngle) / 2;
     const labelRadius = arcRadiusPx * 1.4;
     const headingLabelOffsetRight = x(4.5);
@@ -831,7 +836,7 @@
     const headingLabelY = robotXY.y - Math.sin(arcMidAngle) * labelRadius;
     const angleFontSize = Math.max(18, x(3));
     const headingLabel = new Two.Text(
-      `θₕ = ${theta_h_deg.toFixed(1)}°`,
+      `θₕ = ${theta_h_display.toFixed(1)}°`,
       headingLabelX,
       headingLabelY,
       { size: angleFontSize, leading: angleFontSize },
@@ -2129,7 +2134,7 @@
         />
         <div
           class="turret"
-          style="position: absolute; left: 50%; top: 25%; width: {Math.max(20, x(5))}px; height: {Math.max(20, x(5))}px; transform: translate(-50%, -50%); border-radius: 50%; background: #ea580c; border: 3px solid #c2410c; box-sizing: border-box; z-index: 1;"
+          style="position: absolute; left: 50%; top: {50 - (TURRET_OFFSET_INCHES / robotHeight) * 100}%; width: {Math.max(20, x(5))}px; height: {Math.max(20, x(5))}px; transform: translate(-50%, -50%); border-radius: 50%; background: #ea580c; border: 3px solid #c2410c; box-sizing: border-box; z-index: 1;"
           aria-hidden="true"
         />
         <!-- INTAKE at 90° (right edge). Full-width bar; rotates with bot (no counter-rotate). -->
